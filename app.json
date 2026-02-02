@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Star Map",
+    "slug": "star-map-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000011"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.starmap.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Star Map needs your location to show stars visible from your position.",
+        "NSLocationAlwaysUsageDescription": "Star Map uses your location to calculate visible celestial objects.",
+        "NSMotionUsageDescription": "Star Map uses motion sensors to track where you're pointing your device."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000011"
+      },
+      "package": "com.starmap.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "HIGH_SAMPLING_RATE_SENSORS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Star Map to use your location to show visible stars."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow Star Map to access motion sensors for tracking device orientation."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    }
+  }
+}

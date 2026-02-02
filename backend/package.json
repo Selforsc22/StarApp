@@ -1,0 +1,18 @@
+{
+  "name": "star-map-backend",
+  "version": "1.0.0",
+  "description": "Event aggregator backend for Star Map application",
+  "main": "eventAggregator.js",
+  "scripts": {
+    "start": "node eventAggregator.js",
+    "dev": "nodemon eventAggregator.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

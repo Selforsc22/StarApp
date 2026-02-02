@@ -1,0 +1,414 @@
+{
+  "metadata": {
+    "description": "Constellation patterns with star connections",
+    "source": "IAU official constellation boundaries and traditional asterisms",
+    "note": "Star IDs reference Hipparcos catalog numbers from stars.json"
+  },
+  "constellations": [
+    {
+      "abbreviation": "UMa",
+      "name": "Ursa Major",
+      "genitive": "Ursae Majoris",
+      "stars": [49669, 54879, 58001, 59774, 62956, 65378, 67301],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [2,4]],
+      "center": {"ra": 11.5, "dec": 55.0},
+      "description": "The Great Bear, containing the Big Dipper asterism"
+    },
+    {
+      "abbreviation": "UMi",
+      "name": "Ursa Minor",
+      "genitive": "Ursae Minoris",
+      "stars": [11767, 85822, 82080, 77055, 75097, 72607, 79822],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [3,5]],
+      "center": {"ra": 15.0, "dec": 77.0},
+      "description": "The Little Bear, containing the North Star Polaris"
+    },
+    {
+      "abbreviation": "Ori",
+      "name": "Orion",
+      "genitive": "Orionis",
+      "stars": [27989, 24436, 25336, 26311, 26727, 25930, 28360],
+      "lines": [[0,2], [2,5], [5,3], [3,4], [4,6], [6,1], [3,5]],
+      "center": {"ra": 5.5, "dec": 0.0},
+      "description": "The Hunter, one of the most recognizable constellations"
+    },
+    {
+      "abbreviation": "Cyg",
+      "name": "Cygnus",
+      "genitive": "Cygni",
+      "stars": [102098, 93194, 95853, 102488, 107315],
+      "lines": [[0,1], [1,2], [1,3], [1,4]],
+      "center": {"ra": 20.5, "dec": 42.0},
+      "description": "The Swan, also known as the Northern Cross"
+    },
+    {
+      "abbreviation": "Lyr",
+      "name": "Lyra",
+      "genitive": "Lyrae",
+      "stars": [91262, 91971, 92420, 93194, 92791],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,1]],
+      "center": {"ra": 18.9, "dec": 36.0},
+      "description": "The Lyre, containing the bright star Vega"
+    },
+    {
+      "abbreviation": "Aql",
+      "name": "Aquila",
+      "genitive": "Aquilae",
+      "stars": [97649, 98036, 99473],
+      "lines": [[0,1], [0,2]],
+      "center": {"ra": 19.7, "dec": 3.0},
+      "description": "The Eagle, containing the bright star Altair"
+    },
+    {
+      "abbreviation": "Leo",
+      "name": "Leo",
+      "genitive": "Leonis",
+      "stars": [54061, 57632, 50583, 54872, 53910],
+      "lines": [[0,2], [2,4], [4,3], [3,1], [1,0]],
+      "center": {"ra": 10.7, "dec": 15.0},
+      "description": "The Lion, with Regulus as its heart"
+    },
+    {
+      "abbreviation": "Sco",
+      "name": "Scorpius",
+      "genitive": "Scorpii",
+      "stars": [80763, 78401, 78265, 78820, 82396, 84143],
+      "lines": [[0,1], [1,2], [0,3], [3,4], [4,5]],
+      "center": {"ra": 16.9, "dec": -30.0},
+      "description": "The Scorpion, with red Antares as its heart"
+    },
+    {
+      "abbreviation": "Sgr",
+      "name": "Sagittarius",
+      "genitive": "Sagittarii",
+      "stars": [84012, 90185, 86228, 88635, 85927],
+      "lines": [[0,2], [2,3], [3,1], [1,4], [4,0]],
+      "center": {"ra": 19.0, "dec": -28.0},
+      "description": "The Archer, containing the Teapot asterism"
+    },
+    {
+      "abbreviation": "Cas",
+      "name": "Cassiopeia",
+      "genitive": "Cassiopeiae",
+      "stars": [3179, 2081, 4427, 5447, 6686],
+      "lines": [[0,1], [1,2], [2,3], [3,4]],
+      "center": {"ra": 1.0, "dec": 60.0},
+      "description": "The Queen, shaped like a W or M"
+    },
+    {
+      "abbreviation": "Per",
+      "name": "Perseus",
+      "genitive": "Persei",
+      "stars": [15863, 17702, 14354, 14576, 13268],
+      "lines": [[0,1], [1,2], [0,3], [3,4]],
+      "center": {"ra": 3.5, "dec": 45.0},
+      "description": "The Hero, containing the eclipsing binary Algol"
+    },
+    {
+      "abbreviation": "And",
+      "name": "Andromeda",
+      "genitive": "Andromedae",
+      "stars": [677, 8886, 9640, 5447],
+      "lines": [[0,1], [1,2], [0,3]],
+      "center": {"ra": 0.8, "dec": 37.0},
+      "description": "The Chained Princess, containing the Andromeda Galaxy"
+    },
+    {
+      "abbreviation": "Peg",
+      "name": "Pegasus",
+      "genitive": "Pegasi",
+      "stars": [677, 113963, 113881, 746],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 22.7, "dec": 20.0},
+      "description": "The Winged Horse, containing the Great Square of Pegasus"
+    },
+    {
+      "abbreviation": "Tau",
+      "name": "Taurus",
+      "genitive": "Tauri",
+      "stars": [21421, 25428, 20889, 18724, 20205],
+      "lines": [[0,1], [0,2], [0,4], [4,3]],
+      "center": {"ra": 4.5, "dec": 18.0},
+      "description": "The Bull, containing the Pleiades and Hyades star clusters"
+    },
+    {
+      "abbreviation": "Gem",
+      "name": "Gemini",
+      "genitive": "Geminorum",
+      "stars": [36850, 37826, 35550, 34088, 31681],
+      "lines": [[0,2], [2,4], [1,3], [3,4], [0,1]],
+      "center": {"ra": 7.0, "dec": 25.0},
+      "description": "The Twins, Castor and Pollux"
+    },
+    {
+      "abbreviation": "CMa",
+      "name": "Canis Major",
+      "genitive": "Canis Majoris",
+      "stars": [32349, 33579, 31685, 34444, 30122],
+      "lines": [[0,1], [1,2], [2,3], [0,4], [4,2]],
+      "center": {"ra": 6.8, "dec": -22.0},
+      "description": "The Greater Dog, containing Sirius, the brightest star"
+    },
+    {
+      "abbreviation": "CMi",
+      "name": "Canis Minor",
+      "genitive": "Canis Minoris",
+      "stars": [37279, 42806],
+      "lines": [[0,1]],
+      "center": {"ra": 7.6, "dec": 6.0},
+      "description": "The Lesser Dog, containing bright Procyon"
+    },
+    {
+      "abbreviation": "Cru",
+      "name": "Crux",
+      "genitive": "Crucis",
+      "stars": [60718, 62434, 61084, 59747],
+      "lines": [[0,2], [1,3]],
+      "center": {"ra": 12.5, "dec": -60.0},
+      "description": "The Southern Cross, visible from the Southern Hemisphere"
+    },
+    {
+      "abbreviation": "Cen",
+      "name": "Centaurus",
+      "genitive": "Centauri",
+      "stars": [71683, 68702, 71352, 68933],
+      "lines": [[0,1], [0,2], [2,3]],
+      "center": {"ra": 13.5, "dec": -50.0},
+      "description": "The Centaur, containing the nearest star system Alpha Centauri"
+    },
+    {
+      "abbreviation": "Vir",
+      "name": "Virgo",
+      "genitive": "Virginis",
+      "stars": [65474, 64241, 63090, 69701, 57757],
+      "lines": [[0,2], [2,1], [2,4], [1,3]],
+      "center": {"ra": 13.4, "dec": -2.0},
+      "description": "The Maiden, containing the bright star Spica"
+    },
+    {
+      "abbreviation": "Boo",
+      "name": "Boötes",
+      "genitive": "Boötis",
+      "stars": [69673, 72105, 71075, 74666, 73555],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 14.7, "dec": 30.0},
+      "description": "The Herdsman, containing the bright orange star Arcturus"
+    },
+    {
+      "abbreviation": "CrB",
+      "name": "Corona Borealis",
+      "genitive": "Coronae Borealis",
+      "stars": [72607, 75695, 76267, 76127, 78493],
+      "lines": [[0,1], [1,2], [2,3], [3,4]],
+      "center": {"ra": 15.8, "dec": 33.0},
+      "description": "The Northern Crown, a semicircular arc of stars"
+    },
+    {
+      "abbreviation": "Her",
+      "name": "Hercules",
+      "genitive": "Herculis",
+      "stars": [84345, 86414, 83207, 80816, 80170, 81693],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,5], [5,0]],
+      "center": {"ra": 17.0, "dec": 28.0},
+      "description": "The Hero, containing the famous globular cluster M13"
+    },
+    {
+      "abbreviation": "Oph",
+      "name": "Ophiuchus",
+      "genitive": "Ophiuchi",
+      "stars": [87833, 86032, 84970, 79593, 80894],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 17.4, "dec": -5.0},
+      "description": "The Serpent Bearer, straddling the celestial equator"
+    },
+    {
+      "abbreviation": "Ser",
+      "name": "Serpens",
+      "genitive": "Serpentis",
+      "stars": [77070, 77622, 76276, 78072, 77516],
+      "lines": [[0,1], [1,2], [2,3], [3,4]],
+      "center": {"ra": 16.5, "dec": 10.0},
+      "description": "The Serpent, split into two parts by Ophiuchus"
+    },
+    {
+      "abbreviation": "Dra",
+      "name": "Draco",
+      "genitive": "Draconis",
+      "stars": [107259, 87585, 94376, 85670, 56343, 94648],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,5]],
+      "center": {"ra": 15.0, "dec": 65.0},
+      "description": "The Dragon, winding between the Big and Little Dippers"
+    },
+    {
+      "abbreviation": "Cep",
+      "name": "Cepheus",
+      "genitive": "Cephei",
+      "stars": [1067, 107556, 112724, 3092, 105199],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 22.0, "dec": 70.0},
+      "description": "The King, home of the famous variable star Delta Cephei"
+    },
+    {
+      "abbreviation": "Aqr",
+      "name": "Aquarius",
+      "genitive": "Aquarii",
+      "stars": [110395, 109074, 110960, 109427],
+      "lines": [[0,1], [1,2], [2,3]],
+      "center": {"ra": 22.3, "dec": -12.0},
+      "description": "The Water Bearer, a zodiac constellation"
+    },
+    {
+      "abbreviation": "Cap",
+      "name": "Capricornus",
+      "genitive": "Capricorni",
+      "stars": [106032, 104139, 102978, 102485],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 21.0, "dec": -18.0},
+      "description": "The Sea Goat, a zodiac constellation"
+    },
+    {
+      "abbreviation": "Psc",
+      "name": "Pisces",
+      "genitive": "Piscium",
+      "stars": [9487, 7097, 4906, 5742, 8198],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 0.5, "dec": 12.0},
+      "description": "The Fishes, a zodiac constellation"
+    },
+    {
+      "abbreviation": "Ari",
+      "name": "Aries",
+      "genitive": "Arietis",
+      "stars": [22449, 23015, 8903],
+      "lines": [[0,1], [1,2]],
+      "center": {"ra": 2.5, "dec": 20.0},
+      "description": "The Ram, first sign of the zodiac"
+    },
+    {
+      "abbreviation": "Cet",
+      "name": "Cetus",
+      "genitive": "Ceti",
+      "stars": [12533, 14135, 3419, 8645, 6537],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 1.7, "dec": -10.0},
+      "description": "The Sea Monster, containing the famous variable star Mira"
+    },
+    {
+      "abbreviation": "Eri",
+      "name": "Eridanus",
+      "genitive": "Eridani",
+      "stars": [7588, 17651, 18543, 13847, 12843],
+      "lines": [[0,1], [1,2], [2,3], [3,4]],
+      "center": {"ra": 3.3, "dec": -30.0},
+      "description": "The River, one of the longest constellations"
+    },
+    {
+      "abbreviation": "Lib",
+      "name": "Libra",
+      "genitive": "Librae",
+      "stars": [66249, 74785, 72622, 76333],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 15.2, "dec": -15.0},
+      "description": "The Scales, the only zodiac constellation representing an object"
+    },
+    {
+      "abbreviation": "Crv",
+      "name": "Corvus",
+      "genitive": "Corvi",
+      "stars": [110379, 59803, 59316, 60965],
+      "lines": [[0,1], [1,2], [2,3], [3,0], [0,2]],
+      "center": {"ra": 12.4, "dec": -18.0},
+      "description": "The Crow, a small but distinctive constellation"
+    },
+    {
+      "abbreviation": "Gru",
+      "name": "Grus",
+      "genitive": "Gruis",
+      "stars": [66657, 112122, 109268, 114131],
+      "lines": [[0,1], [1,2], [2,3]],
+      "center": {"ra": 22.5, "dec": -45.0},
+      "description": "The Crane, a southern constellation"
+    },
+    {
+      "abbreviation": "Pav",
+      "name": "Pavo",
+      "genitive": "Pavonis",
+      "stars": [100751, 102395, 99240, 98495],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 19.6, "dec": -65.0},
+      "description": "The Peacock, a southern constellation"
+    },
+    {
+      "abbreviation": "PsA",
+      "name": "Piscis Austrinus",
+      "genitive": "Piscis Austrini",
+      "stars": [113368, 111954, 109285, 107608],
+      "lines": [[0,1], [1,2], [2,3]],
+      "center": {"ra": 22.5, "dec": -30.0},
+      "description": "The Southern Fish, containing the bright star Fomalhaut"
+    },
+    {
+      "abbreviation": "CVn",
+      "name": "Canes Venatici",
+      "genitive": "Canum Venaticorum",
+      "stars": [61281, 61317],
+      "lines": [[0,1]],
+      "center": {"ra": 13.0, "dec": 40.0},
+      "description": "The Hunting Dogs, containing the famous Whirlpool Galaxy"
+    },
+    {
+      "abbreviation": "Hya",
+      "name": "Hydra",
+      "genitive": "Hydrae",
+      "stars": [45238, 42313, 43813, 46390, 48356],
+      "lines": [[0,1], [1,2], [2,3], [3,4]],
+      "center": {"ra": 10.5, "dec": -20.0},
+      "description": "The Water Snake, the largest constellation"
+    },
+    {
+      "abbreviation": "Car",
+      "name": "Carina",
+      "genitive": "Carinae",
+      "stars": [30438, 30324, 45556, 45238],
+      "lines": [[0,1], [1,2], [2,3]],
+      "center": {"ra": 8.5, "dec": -60.0},
+      "description": "The Keel, containing the second-brightest star Canopus"
+    },
+    {
+      "abbreviation": "Vel",
+      "name": "Vela",
+      "genitive": "Velorum",
+      "stars": [44816, 42913, 46651, 50099],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 9.4, "dec": -47.0},
+      "description": "The Sails, part of the ancient Argo Navis"
+    },
+    {
+      "abbreviation": "Pup",
+      "name": "Puppis",
+      "genitive": "Puppis",
+      "stars": [39953, 39429, 35904, 36917],
+      "lines": [[0,1], [1,2], [2,3]],
+      "center": {"ra": 7.5, "dec": -32.0},
+      "description": "The Stern, part of the ancient Argo Navis"
+    },
+    {
+      "abbreviation": "Aur",
+      "name": "Auriga",
+      "genitive": "Aurigae",
+      "stars": [24608, 23416, 24155, 28380, 25428],
+      "lines": [[0,1], [1,2], [2,3], [3,4], [4,0]],
+      "center": {"ra": 6.0, "dec": 42.0},
+      "description": "The Charioteer, containing the bright star Capella"
+    },
+    {
+      "abbreviation": "Phe",
+      "name": "Phoenix",
+      "genitive": "Phoenicis",
+      "stars": [2021, 5165, 2472, 6867],
+      "lines": [[0,1], [1,2], [2,3], [3,0]],
+      "center": {"ra": 0.9, "dec": -48.0},
+      "description": "The Phoenix, a southern constellation"
+    }
+  ]
+}
