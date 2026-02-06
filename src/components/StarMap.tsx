@@ -61,6 +61,7 @@ interface StarMapProps {
   settings: ViewSettings;
   onStarSelect?: (star: VisibleStar) => void;
   onViewChange?: (view: ViewDirection) => void;
+  onPanelVisibilityChange?: (isVisible: boolean) => void;
 }
 
 // Extended star data with position for click detection
@@ -571,6 +572,7 @@ export function StarMap({
   settings,
   onStarSelect,
   onViewChange,
+  onPanelVisibilityChange,
 }: StarMapProps) {
   const [stars, setStars] = useState<Star[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -578,6 +580,13 @@ export function StarMap({
 
   // Manual offset for drag navigation
   const [manualOffset, setManualOffset] = useState({ azimuth: 0, altitude: 0 });
+
+  // Notify parent when star info panel visibility changes
+  useEffect(() => {
+    if (onPanelVisibilityChange) {
+      onPanelVisibilityChange(selectedStar !== null);
+    }
+  }, [selectedStar, onPanelVisibilityChange]);
 
   // Report combined view direction to parent
   useEffect(() => {

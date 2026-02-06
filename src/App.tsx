@@ -83,6 +83,7 @@ export default function App(): JSX.Element {
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [isStarPanelVisible, setIsStarPanelVisible] = useState(false);
 
   // Update observation time
   useEffect(() => {
@@ -108,6 +109,11 @@ export default function App(): JSX.Element {
   // Handle view direction changes from StarMap (includes manual scrolling)
   const handleViewChange = useCallback((view: ViewDirection) => {
     setCurrentView(view);
+  }, []);
+
+  // Handle star info panel visibility changes
+  const handlePanelVisibilityChange = useCallback((isVisible: boolean) => {
+    setIsStarPanelVisible(isVisible);
   }, []);
 
   // Update view settings
@@ -150,6 +156,7 @@ export default function App(): JSX.Element {
           observationTime={observationTime}
           settings={settings.view}
           onViewChange={handleViewChange}
+          onPanelVisibilityChange={handlePanelVisibilityChange}
         />
 
         {/* Top Info Bar */}
@@ -199,8 +206,8 @@ export default function App(): JSX.Element {
           </SafeAreaView>
         )}
 
-        {/* Pointing Info (Center) - Shows current view direction */}
-        {settings.view.showInfo && (
+        {/* Pointing Info (Center) - Shows current view direction (hidden when star panel open) */}
+        {settings.view.showInfo && !isStarPanelVisible && (
           <View style={styles.pointingInfo}>
             <Text style={[styles.pointingText, nightModeStyle]}>
               {formatAzimuth(currentView.azimuth)}
@@ -211,8 +218,8 @@ export default function App(): JSX.Element {
           </View>
         )}
 
-        {/* Compass Indicator - Rotates based on view direction */}
-        {settings.view.showCompass && (
+        {/* Compass Indicator - Rotates based on view direction (hidden when star panel open) */}
+        {settings.view.showCompass && !isStarPanelVisible && (
           <View style={styles.compassContainer}>
             <View
               style={[
