@@ -650,3 +650,6 @@ export function formatDec(decDegrees: number): string {
 
   return `${sign}${d.toString().padStart(2, '0')}° ${m.toString().padStart(2, '0')}' ${s.toFixed(1).padStart(4, '0')}"`;
 }
+
+// Re-export utility functions from timeCalculations for convenience
+export { degreesToRadians, radiansToDegrees, normalizeAngle } from './timeCalculations';
