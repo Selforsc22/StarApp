@@ -7,6 +7,7 @@
  * - Sensor initialization and updates
  * - Calibration status display
  * - Error handling and user guidance
+ * - Web platform fallback with default location
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -24,7 +25,6 @@ import {
   GeographicCoordinates,
   DevicePointing,
   CalibrationStatus,
-  PermissionStatus,
 } from '../types';
 import { sensorManager } from '../services/sensorManager';
 
@@ -43,6 +43,23 @@ interface SensorAvailability {
   location: boolean;
 }
 
+// Default location (New York City) for web fallback
+const DEFAULT_LOCATION: GeographicCoordinates = {
+  latitude: 40.7128,
+  longitude: -74.006,
+  elevation: 10,
+};
+
+// Default pointing direction (looking south, 45 degrees up)
+const DEFAULT_POINTING: DevicePointing = {
+  pointing: {
+    altitude: 45,
+    azimuth: 180,
+  },
+  fieldOfView: 60,
+  calibrationStatus: 'medium',
+};
+
 export function OrientationHandler({
   onLocationUpdate,
   onOrientationUpdate,
@@ -55,6 +72,7 @@ export function OrientationHandler({
   const [showCalibrationModal, setShowCalibrationModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [isWeb, setIsWeb] = useState(false);
 
   // Initialize sensors
   useEffect(() => {
@@ -62,20 +80,55 @@ export function OrientationHandler({
       try {
         setIsInitializing(true);
 
-        // Check sensor availability
+        // Check if running on web
+        const isWebPlatform = Platform.OS === 'web';
+        setIsWeb(isWebPlatform);
+
+        if (isWebPlatform) {
+          // Web platform: use defaults and try to get location from browser
+          console.log('Running on web - using default orientation');
+
+          // Try to get browser geolocation
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const webLocation: GeographicCoordinates = {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  elevation: position.coords.altitude || undefined,
+                };
+                onLocationUpdate(webLocation);
+              },
+              (err) => {
+                console.log('Browser geolocation failed, using default:', err.message);
+                onLocationUpdate(DEFAULT_LOCATION);
+              },
+              { enableHighAccuracy: true, timeout: 5000 }
+            );
+          } else {
+            onLocationUpdate(DEFAULT_LOCATION);
+          }
+
+          // Use default pointing for web (user can't point phone at sky on web)
+          onOrientationUpdate(DEFAULT_POINTING);
+          setCalibrationStatus('medium');
+          setIsInitializing(false);
+          return;
+        }
+
+        // Native platform: initialize real sensors
         const availability = await sensorManager.initialize();
         setSensorAvailability(availability);
 
         // Check if we have required sensors
         if (!availability.location) {
-          setPermissionDenied(true);
-          setError('Location permission is required for the star map to work correctly.');
-          return;
+          // Don't block - use default location
+          console.log('Location not available, using default');
+          onLocationUpdate(DEFAULT_LOCATION);
         }
 
         if (!availability.deviceMotion && !availability.accelerometer) {
           setError('Motion sensors are not available on this device.');
-          // Continue anyway - user can still use manual navigation
         }
 
         if (!availability.magnetometer) {
@@ -94,6 +147,17 @@ export function OrientationHandler({
         const initialLocation = sensorManager.getLocation();
         if (initialLocation) {
           onLocationUpdate(initialLocation);
+        } else {
+          // Use default if no location available yet
+          onLocationUpdate(DEFAULT_LOCATION);
+        }
+
+        // Provide initial orientation
+        const initialPointing = sensorManager.getPointing();
+        if (initialPointing) {
+          onOrientationUpdate(initialPointing);
+        } else {
+          onOrientationUpdate(DEFAULT_POINTING);
         }
 
         setIsInitializing(false);
@@ -107,7 +171,10 @@ export function OrientationHandler({
         };
       } catch (err) {
         console.error('Failed to initialize sensors:', err);
-        setError('Failed to initialize sensors. Please restart the app.');
+        // Don't block on error - use defaults
+        onLocationUpdate(DEFAULT_LOCATION);
+        onOrientationUpdate(DEFAULT_POINTING);
+        setError('Sensors unavailable - using default location.');
         setIsInitializing(false);
       }
     }
@@ -132,17 +199,17 @@ export function OrientationHandler({
 
       if (availability.location) {
         await sensorManager.start();
-        setIsInitializing(false);
       } else {
-        setPermissionDenied(true);
-        setError('Location permission is still required.');
+        onLocationUpdate(DEFAULT_LOCATION);
       }
+      setIsInitializing(false);
     } catch (err) {
       setError('Failed to get permissions.');
+      onLocationUpdate(DEFAULT_LOCATION);
+      onOrientationUpdate(DEFAULT_POINTING);
+      setIsInitializing(false);
     }
-
-    setIsInitializing(false);
-  }, []);
+  }, [onLocationUpdate, onOrientationUpdate]);
 
   // Render loading state
   if (isInitializing) {
@@ -156,35 +223,23 @@ export function OrientationHandler({
     );
   }
 
-  // Render permission denied state
-  if (permissionDenied) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="location-outline" size={64} color="#ff4444" />
-          <Text style={styles.errorTitle}>Location Required</Text>
-          <Text style={styles.errorText}>
-            Star Map needs access to your location to show you the stars visible from where you are.
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetryPermissions}>
-            <Text style={styles.retryButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-          <Text style={styles.errorHint}>
-            If the permission dialog doesn't appear, please enable location access in your device
-            settings.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* Main content */}
       {children}
 
+      {/* Web platform notice */}
+      {isWeb && (
+        <View style={styles.webNotice}>
+          <Ionicons name="desktop-outline" size={16} color="#4488ff" />
+          <Text style={styles.webNoticeText}>
+            Web mode - using default location. For full experience, use mobile app.
+          </Text>
+        </View>
+      )}
+
       {/* Calibration indicator */}
-      {calibrationStatus !== 'high' && (
+      {!isWeb && calibrationStatus !== 'high' && (
         <TouchableOpacity
           style={styles.calibrationIndicator}
           onPress={showCalibrationInstructions}
@@ -362,6 +417,24 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 12,
     fontWeight: '500',
+  },
+  webNotice: {
+    position: 'absolute',
+    top: 40,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 40, 80, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  webNoticeText: {
+    flex: 1,
+    color: '#88bbff',
+    fontSize: 12,
+    marginLeft: 8,
   },
   errorBanner: {
     position: 'absolute',

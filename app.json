@@ -4,13 +4,7 @@
     "slug": "star-map-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000011"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -27,10 +21,6 @@
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000011"
-      },
       "package": "com.starmap.app",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -39,7 +29,6 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -55,11 +44,6 @@
           "motionPermission": "Allow Star Map to access motion sensors for tracking device orientation."
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
-    }
+    ]
   }
 }
