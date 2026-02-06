@@ -11,34 +11,39 @@
  * - Color-coded stars by spectral type
  * - Smooth camera movement with device orientation
  * - Touch/mouse drag to look around the sky
+ * - Click/tap on stars to identify them
  * - Viewport culling for performance
  */
 
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent, PanResponderGestureState, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { Canvas, useFrame, useThree, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   Star,
   VisibleStar,
   GeographicCoordinates,
   DevicePointing,
-  Quaternion,
+  HorizontalCoordinates,
   ViewSettings,
   Observer,
 } from '../types';
 import { starCatalog } from '../services/starCatalog';
-import { processStarsForRendering, getStarColor, calculateStarSize } from '../services/astronomyCalculations';
+import { getStarColor, calculateStarSize } from '../services/astronomyCalculations';
 import {
   equatorialToHorizontal,
   horizontalToCartesian,
   degreesToRadians,
+  formatRA,
+  formatDec,
 } from '../utils/coordinateConversion';
 
 // Constants for rendering
 const CELESTIAL_SPHERE_RADIUS = 100;
 const MIN_STAR_SIZE = 1;
 const MAX_STAR_SIZE = 8;
+const CLICK_THRESHOLD = 5; // pixels - if drag is less than this, treat as click
+const STAR_CLICK_RADIUS = 3; // Size of clickable area for stars
 
 // Drag sensitivity (degrees per pixel)
 const DRAG_SENSITIVITY = 0.3;
@@ -51,6 +56,12 @@ interface StarMapProps {
   onStarSelect?: (star: VisibleStar) => void;
 }
 
+// Extended star data with position for click detection
+interface RenderedStar extends Star {
+  position: THREE.Vector3;
+  horizontal: HorizontalCoordinates;
+}
+
 /**
  * Star Points component
  * Renders stars as a point cloud for efficient rendering
@@ -59,16 +70,19 @@ interface StarPointsProps {
   stars: Star[];
   observer: Observer;
   magnitudeLimit: number;
+  onStarClick: (star: RenderedStar) => void;
+  renderedStarsRef: React.MutableRefObject<RenderedStar[]>;
 }
 
-function StarPoints({ stars, observer, magnitudeLimit }: StarPointsProps) {
+function StarPoints({ stars, observer, magnitudeLimit, onStarClick, renderedStarsRef }: StarPointsProps) {
   const pointsRef = useRef<THREE.Points>(null);
 
   // Process stars and create geometry
-  const { positions, colors, sizes } = useMemo(() => {
+  const { positions, colors, sizes, renderedStars } = useMemo(() => {
     const posArray: number[] = [];
     const colorArray: number[] = [];
     const sizeArray: number[] = [];
+    const rendered: RenderedStar[] = [];
 
     for (const star of stars) {
       if (star.magnitude > magnitudeLimit) continue;
@@ -85,6 +99,7 @@ function StarPoints({ stars, observer, magnitudeLimit }: StarPointsProps) {
 
       // Convert to 3D cartesian on celestial sphere
       const cartesian = horizontalToCartesian(horizontal, CELESTIAL_SPHERE_RADIUS);
+      const position = new THREE.Vector3(cartesian.x, cartesian.y, cartesian.z);
 
       posArray.push(cartesian.x, cartesian.y, cartesian.z);
 
@@ -96,14 +111,27 @@ function StarPoints({ stars, observer, magnitudeLimit }: StarPointsProps) {
       // Calculate size based on magnitude
       const size = calculateStarSize(star.magnitude, MAX_STAR_SIZE);
       sizeArray.push(size);
+
+      // Store rendered star data for click detection
+      rendered.push({
+        ...star,
+        position,
+        horizontal,
+      });
     }
 
     return {
       positions: new Float32Array(posArray),
       colors: new Float32Array(colorArray),
       sizes: new Float32Array(sizeArray),
+      renderedStars: rendered,
     };
   }, [stars, observer, magnitudeLimit]);
+
+  // Update ref for parent component
+  useEffect(() => {
+    renderedStarsRef.current = renderedStars;
+  }, [renderedStars, renderedStarsRef]);
 
   // Create buffer geometry
   const geometry = useMemo(() => {
@@ -154,6 +182,40 @@ function StarPoints({ stars, observer, magnitudeLimit }: StarPointsProps) {
 }
 
 /**
+ * Clickable star spheres for named stars
+ * These are invisible but detect clicks
+ */
+interface ClickableStarsProps {
+  renderedStars: RenderedStar[];
+  onStarClick: (star: RenderedStar) => void;
+}
+
+function ClickableStars({ renderedStars, onStarClick }: ClickableStarsProps) {
+  // Only create clickable spheres for named/bright stars (magnitude < 3)
+  const clickableStars = useMemo(() => {
+    return renderedStars.filter(star => star.name || star.magnitude < 3);
+  }, [renderedStars]);
+
+  return (
+    <group>
+      {clickableStars.map((star, index) => (
+        <mesh
+          key={star.id || index}
+          position={[star.position.x, star.position.y, star.position.z]}
+          onClick={(e: ThreeEvent<MouseEvent>) => {
+            e.stopPropagation();
+            onStarClick(star);
+          }}
+        >
+          <sphereGeometry args={[STAR_CLICK_RADIUS, 8, 8]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/**
  * Create a circular star texture
  */
 function createStarTexture(): THREE.Texture {
@@ -196,7 +258,6 @@ function SkyBackground() {
   useEffect(() => {
     // Create gradient background
     const topColor = new THREE.Color(0x000011); // Very dark blue
-    const bottomColor = new THREE.Color(0x000005); // Nearly black
 
     scene.background = topColor;
   }, [scene]);
@@ -216,7 +277,6 @@ interface CameraControllerProps {
 
 function CameraController({ pointing, manualOffset, fov }: CameraControllerProps) {
   const { camera } = useThree();
-  const targetRotation = useRef(new THREE.Quaternion());
 
   useFrame(() => {
     // Combine device pointing with manual offset
@@ -234,11 +294,8 @@ function CameraController({ pointing, manualOffset, fov }: CameraControllerProps
     // Normalize azimuth to 0-360
     azimuth = ((azimuth % 360) + 360) % 360;
 
-    // Create rotation quaternion from altitude/azimuth
-    // Camera looks from origin toward the celestial sphere
-
     // Azimuth rotation (around Y axis)
-    const azRad = degreesToRadians(-azimuth + 180); // Adjust for camera direction
+    const azRad = degreesToRadians(-azimuth + 180);
     const altRad = degreesToRadians(altitude);
 
     // Set camera to look in the pointing direction
@@ -262,7 +319,6 @@ function CameraController({ pointing, manualOffset, fov }: CameraControllerProps
 
 /**
  * Horizon line component
- * Draws a circle at the horizon for reference
  */
 function HorizonLine() {
   const segments = 128;
@@ -292,7 +348,6 @@ function HorizonLine() {
 
 /**
  * Cardinal directions component
- * Shows N, E, S, W labels at the horizon
  */
 function CardinalDirections() {
   const directions = [
@@ -313,7 +368,6 @@ function CardinalDirections() {
 
         return (
           <group key={label} position={[x, 0, z]}>
-            {/* Direction marker */}
             <mesh>
               <sphereGeometry args={[1, 8, 8]} />
               <meshBasicMaterial color={label === 'N' ? 0xff4444 : 0x4444ff} />
@@ -324,6 +378,163 @@ function CardinalDirections() {
     </group>
   );
 }
+
+/**
+ * Star Info Panel Component
+ */
+interface StarInfoPanelProps {
+  star: RenderedStar | null;
+  onClose: () => void;
+}
+
+function StarInfoPanel({ star, onClose }: StarInfoPanelProps) {
+  if (!star) return null;
+
+  const starColor = getStarColor(star.spectralType, star.colorIndex);
+
+  return (
+    <View style={infoStyles.container}>
+      <View style={infoStyles.panel}>
+        <View style={infoStyles.header}>
+          <View style={[infoStyles.colorDot, { backgroundColor: starColor }]} />
+          <Text style={infoStyles.title}>{star.name || `HIP ${star.hipId}` || 'Unknown Star'}</Text>
+          <TouchableOpacity onPress={onClose} style={infoStyles.closeButton}>
+            <Text style={infoStyles.closeText}>×</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={infoStyles.content}>
+          {star.constellation && (
+            <View style={infoStyles.row}>
+              <Text style={infoStyles.label}>Constellation:</Text>
+              <Text style={infoStyles.value}>{star.constellation}</Text>
+            </View>
+          )}
+
+          <View style={infoStyles.row}>
+            <Text style={infoStyles.label}>Magnitude:</Text>
+            <Text style={infoStyles.value}>{star.magnitude.toFixed(2)}</Text>
+          </View>
+
+          {star.spectralType && (
+            <View style={infoStyles.row}>
+              <Text style={infoStyles.label}>Spectral Type:</Text>
+              <Text style={infoStyles.value}>{star.spectralType}</Text>
+            </View>
+          )}
+
+          <View style={infoStyles.row}>
+            <Text style={infoStyles.label}>Right Ascension:</Text>
+            <Text style={infoStyles.value}>{formatRA(star.coordinates.ra)}</Text>
+          </View>
+
+          <View style={infoStyles.row}>
+            <Text style={infoStyles.label}>Declination:</Text>
+            <Text style={infoStyles.value}>{formatDec(star.coordinates.dec)}</Text>
+          </View>
+
+          <View style={infoStyles.divider} />
+
+          <Text style={infoStyles.sectionTitle}>Current Position</Text>
+
+          <View style={infoStyles.row}>
+            <Text style={infoStyles.label}>Altitude:</Text>
+            <Text style={infoStyles.value}>{star.horizontal.altitude.toFixed(1)}°</Text>
+          </View>
+
+          <View style={infoStyles.row}>
+            <Text style={infoStyles.label}>Azimuth:</Text>
+            <Text style={infoStyles.value}>{star.horizontal.azimuth.toFixed(1)}°</Text>
+          </View>
+
+          {star.distance && (
+            <>
+              <View style={infoStyles.divider} />
+              <View style={infoStyles.row}>
+                <Text style={infoStyles.label}>Distance:</Text>
+                <Text style={infoStyles.value}>{star.distance.toFixed(1)} light years</Text>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const infoStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 100,
+    left: 16,
+    right: 16,
+    zIndex: 100,
+    pointerEvents: 'box-none',
+  } as any,
+  panel: {
+    backgroundColor: 'rgba(10, 10, 30, 0.95)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.3)',
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  colorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  title: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  closeText: {
+    color: '#888888',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  content: {
+    padding: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  label: {
+    color: '#888888',
+    fontSize: 14,
+  },
+  value: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 12,
+  },
+  sectionTitle: {
+    color: '#4488ff',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+});
 
 /**
  * Main StarMap component
@@ -337,13 +548,19 @@ export function StarMap({
 }: StarMapProps) {
   const [stars, setStars] = useState<Star[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedStar, setSelectedStar] = useState<RenderedStar | null>(null);
 
   // Manual offset for drag navigation
   const [manualOffset, setManualOffset] = useState({ azimuth: 0, altitude: 0 });
 
   // Track if we're currently dragging
   const isDragging = useRef(false);
+  const dragStartPosition = useRef({ x: 0, y: 0 });
   const lastDragPosition = useRef({ x: 0, y: 0 });
+  const totalDragDistance = useRef(0);
+
+  // Rendered stars for click detection
+  const renderedStarsRef = useRef<RenderedStar[]>([]);
 
   // Load star catalog
   useEffect(() => {
@@ -371,13 +588,27 @@ export function StarMap({
     };
   }, [location, observationTime]);
 
+  // Handle star click from Three.js
+  const handleStarClick = useCallback((star: RenderedStar) => {
+    setSelectedStar(star);
+    if (onStarSelect) {
+      onStarSelect({
+        ...star,
+        horizontal: star.horizontal,
+        screenPosition: { x: 0, y: 0, visible: true },
+      });
+    }
+  }, [onStarSelect]);
+
   // Handle drag/pan for mobile using PanResponder
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (evt: GestureResponderEvent) => {
       isDragging.current = true;
+      totalDragDistance.current = 0;
       const touch = evt.nativeEvent;
+      dragStartPosition.current = { x: touch.pageX, y: touch.pageY };
       lastDragPosition.current = { x: touch.pageX, y: touch.pageY };
     },
     onPanResponderMove: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
@@ -387,6 +618,7 @@ export function StarMap({
       const deltaX = touch.pageX - lastDragPosition.current.x;
       const deltaY = touch.pageY - lastDragPosition.current.y;
 
+      totalDragDistance.current += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
       lastDragPosition.current = { x: touch.pageX, y: touch.pageY };
 
       // Update manual offset
@@ -407,6 +639,8 @@ export function StarMap({
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (Platform.OS !== 'web') return;
     isDragging.current = true;
+    totalDragDistance.current = 0;
+    dragStartPosition.current = { x: e.clientX, y: e.clientY };
     lastDragPosition.current = { x: e.clientX, y: e.clientY };
   }, []);
 
@@ -416,6 +650,7 @@ export function StarMap({
     const deltaX = e.clientX - lastDragPosition.current.x;
     const deltaY = e.clientY - lastDragPosition.current.y;
 
+    totalDragDistance.current += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     lastDragPosition.current = { x: e.clientX, y: e.clientY };
 
     setManualOffset(prev => ({
@@ -434,10 +669,8 @@ export function StarMap({
     isDragging.current = false;
   }, []);
 
-  // Handle wheel for zoom (optional enhancement)
+  // Handle wheel for vertical panning
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    // Could be used to adjust FOV for zoom
-    // For now, we'll just use it for vertical scrolling
     setManualOffset(prev => ({
       ...prev,
       altitude: Math.max(-89, Math.min(89, prev.altitude - e.deltaY * 0.1)),
@@ -493,6 +726,14 @@ export function StarMap({
           stars={stars}
           observer={observer}
           magnitudeLimit={settings.magnitudeLimit}
+          onStarClick={handleStarClick}
+          renderedStarsRef={renderedStarsRef}
+        />
+
+        {/* Clickable stars for selection */}
+        <ClickableStars
+          renderedStars={renderedStarsRef.current}
+          onStarClick={handleStarClick}
         />
 
         {/* Horizon reference */}
@@ -505,16 +746,21 @@ export function StarMap({
         <ambientLight intensity={0.1} />
       </Canvas>
 
+      {/* Star Info Panel */}
+      <StarInfoPanel star={selectedStar} onClose={() => setSelectedStar(null)} />
+
       {/* Instructions overlay */}
-      <View style={styles.instructions}>
-        <View style={styles.instructionBadge}>
-          <Text style={styles.text}>
-            {Platform.OS === 'web'
-              ? 'Drag to look around • Scroll to pan up/down'
-              : 'Drag to look around the sky'}
-          </Text>
+      {!selectedStar && (
+        <View style={styles.instructions}>
+          <View style={styles.instructionBadge}>
+            <Text style={styles.text}>
+              {Platform.OS === 'web'
+                ? 'Drag to look around • Click a star to identify'
+                : 'Drag to look around • Tap a star to identify'}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
