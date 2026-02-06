@@ -33,7 +33,7 @@ import {
   TimeSettings,
   AppSettings,
 } from './types';
-import { StarMap } from './components/StarMap';
+import { StarMap, ViewDirection } from './components/StarMap';
 import { OrientationHandler } from './components/OrientationHandler';
 import { EventList } from './components/EventList';
 import { sensorManager } from './services/sensorManager';
@@ -76,6 +76,7 @@ export default function App(): JSX.Element {
   // State
   const [location, setLocation] = useState<GeographicCoordinates | null>(null);
   const [pointing, setPointing] = useState<DevicePointing | null>(null);
+  const [currentView, setCurrentView] = useState<ViewDirection>({ azimuth: 180, altitude: 45 });
   const [observationTime, setObservationTime] = useState<Date>(new Date());
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showEvents, setShowEvents] = useState(false);
@@ -102,6 +103,11 @@ export default function App(): JSX.Element {
   // Handle orientation updates
   const handleOrientationUpdate = useCallback((newPointing: DevicePointing) => {
     setPointing(newPointing);
+  }, []);
+
+  // Handle view direction changes from StarMap (includes manual scrolling)
+  const handleViewChange = useCallback((view: ViewDirection) => {
+    setCurrentView(view);
   }, []);
 
   // Update view settings
@@ -143,6 +149,7 @@ export default function App(): JSX.Element {
           pointing={pointing}
           observationTime={observationTime}
           settings={settings.view}
+          onViewChange={handleViewChange}
         />
 
         {/* Top Info Bar */}
@@ -192,25 +199,25 @@ export default function App(): JSX.Element {
           </SafeAreaView>
         )}
 
-        {/* Pointing Info (Center) */}
-        {pointing && settings.view.showInfo && (
+        {/* Pointing Info (Center) - Shows current view direction */}
+        {settings.view.showInfo && (
           <View style={styles.pointingInfo}>
             <Text style={[styles.pointingText, nightModeStyle]}>
-              {formatAzimuth(pointing.pointing.azimuth)}
+              {formatAzimuth(currentView.azimuth)}
             </Text>
             <Text style={[styles.pointingAltitude, nightModeStyle]}>
-              Alt: {formatAltitude(pointing.pointing.altitude)}
+              Alt: {formatAltitude(currentView.altitude)}
             </Text>
           </View>
         )}
 
-        {/* Compass Indicator */}
-        {settings.view.showCompass && pointing && (
+        {/* Compass Indicator - Rotates based on view direction */}
+        {settings.view.showCompass && (
           <View style={styles.compassContainer}>
             <View
               style={[
                 styles.compassRose,
-                { transform: [{ rotate: `${-pointing.pointing.azimuth}deg` }] },
+                { transform: [{ rotate: `${-currentView.azimuth}deg` }] },
               ]}
             >
               <Text style={[styles.compassN, nightModeStyle]}>N</Text>

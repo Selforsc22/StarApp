@@ -48,12 +48,19 @@ const STAR_CLICK_RADIUS = 3; // Size of clickable area for stars
 // Drag sensitivity (degrees per pixel)
 const DRAG_SENSITIVITY = 0.3;
 
+// View direction for tracking camera position
+export interface ViewDirection {
+  azimuth: number;
+  altitude: number;
+}
+
 interface StarMapProps {
   location: GeographicCoordinates | null;
   pointing: DevicePointing | null;
   observationTime: Date;
   settings: ViewSettings;
   onStarSelect?: (star: VisibleStar) => void;
+  onViewChange?: (view: ViewDirection) => void;
 }
 
 // Extended star data with position for click detection
@@ -545,6 +552,7 @@ export function StarMap({
   observationTime,
   settings,
   onStarSelect,
+  onViewChange,
 }: StarMapProps) {
   const [stars, setStars] = useState<Star[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -552,6 +560,28 @@ export function StarMap({
 
   // Manual offset for drag navigation
   const [manualOffset, setManualOffset] = useState({ azimuth: 0, altitude: 0 });
+
+  // Report combined view direction to parent
+  useEffect(() => {
+    if (!onViewChange) return;
+
+    // Calculate combined view direction
+    let altitude = manualOffset.altitude;
+    let azimuth = manualOffset.azimuth;
+
+    if (pointing) {
+      altitude += pointing.pointing.altitude;
+      azimuth += pointing.pointing.azimuth;
+    }
+
+    // Clamp altitude
+    altitude = Math.max(-89, Math.min(89, altitude));
+
+    // Normalize azimuth to 0-360
+    azimuth = ((azimuth % 360) + 360) % 360;
+
+    onViewChange({ azimuth, altitude });
+  }, [manualOffset, pointing, onViewChange]);
 
   // Track if we're currently dragging
   const isDragging = useRef(false);
