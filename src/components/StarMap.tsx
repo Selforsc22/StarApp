@@ -463,6 +463,11 @@ function StarInfoPanel({ star, onClose }: StarInfoPanelProps) {
               </View>
             </>
           )}
+
+          {/* Close Button */}
+          <TouchableOpacity style={infoStyles.closeButtonLarge} onPress={onClose}>
+            <Text style={infoStyles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -540,6 +545,19 @@ const infoStyles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     marginBottom: 8,
+  },
+  closeButtonLarge: {
+    backgroundColor: '#4488ff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
