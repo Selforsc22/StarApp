@@ -27,7 +27,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
+import { format, isToday, isTomorrow, isYesterday, differenceInDays, startOfDay, subDays } from 'date-fns';
 import {
   AstronomicalEvent,
   EventType,
@@ -90,6 +90,9 @@ function getPriorityColor(priority: EventPriority): string {
  * Format event date
  */
 function formatEventDate(date: Date): string {
+  if (isYesterday(date)) {
+    return 'Yesterday';
+  }
   if (isToday(date)) {
     return 'Today';
   }
@@ -97,10 +100,30 @@ function formatEventDate(date: Date): string {
     return 'Tomorrow';
   }
   const daysAway = differenceInDays(date, new Date());
-  if (daysAway <= 7) {
+  if (daysAway > 0 && daysAway <= 7) {
     return format(date, 'EEEE'); // Day name
   }
   return format(date, 'MMM d');
+}
+
+/**
+ * Check if event should be shown (yesterday or later)
+ */
+function shouldShowEvent(event: AstronomicalEvent): boolean {
+  const now = new Date();
+  const yesterday = startOfDay(subDays(now, 1));
+
+  // Show if event starts from yesterday onwards
+  if (event.startTime >= yesterday) {
+    return true;
+  }
+
+  // Also show if event is still active (end time is in the future)
+  if (event.endTime && event.endTime >= yesterday) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
