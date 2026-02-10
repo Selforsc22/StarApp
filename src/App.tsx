@@ -22,6 +22,9 @@ import {
   Modal,
   Switch,
   ScrollView,
+  TextInput,
+  FlatList,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -32,8 +35,10 @@ import {
   ViewSettings,
   TimeSettings,
   AppSettings,
+  Star,
 } from './types';
 import { StarMap, ViewDirection } from './components/StarMap';
+import { starCatalog } from './services/starCatalog';
 import { OrientationHandler } from './components/OrientationHandler';
 import { EventList } from './components/EventList';
 import { sensorManager } from './services/sensorManager';
@@ -84,6 +89,7 @@ export default function App(): JSX.Element {
   const [showSearch, setShowSearch] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [isStarPanelVisible, setIsStarPanelVisible] = useState(false);
+  const [targetStar, setTargetStar] = useState<Star | null>(null);
 
   // Update observation time
   useEffect(() => {
@@ -114,6 +120,12 @@ export default function App(): JSX.Element {
   // Handle star info panel visibility changes
   const handlePanelVisibilityChange = useCallback((isVisible: boolean) => {
     setIsStarPanelVisible(isVisible);
+  }, []);
+
+  // Handle star selection from search
+  const handleSearchSelectStar = useCallback((star: Star) => {
+    setTargetStar(star);
+    setShowSearch(false);
   }, []);
 
   // Update view settings
@@ -157,6 +169,8 @@ export default function App(): JSX.Element {
           settings={settings.view}
           onViewChange={handleViewChange}
           onPanelVisibilityChange={handlePanelVisibilityChange}
+          targetStar={targetStar}
+          onTargetStarReached={() => setTargetStar(null)}
         />
 
         {/* Top Info Bar */}
@@ -218,8 +232,8 @@ export default function App(): JSX.Element {
           </View>
         )}
 
-        {/* Compass Indicator - Rotates based on view direction (hidden when star panel open) */}
-        {settings.view.showCompass && !isStarPanelVisible && (
+        {/* Compass Indicator - Rotates based on view direction */}
+        {settings.view.showCompass && (
           <View style={styles.compassContainer}>
             <View
               style={[
@@ -333,6 +347,14 @@ export default function App(): JSX.Element {
           onUpdateView={updateViewSettings}
           nightMode={settings.view.nightMode}
         />
+
+        {/* Search Modal */}
+        <SearchModal
+          visible={showSearch}
+          onClose={() => setShowSearch(false)}
+          onSelectStar={handleSearchSelectStar}
+          nightMode={settings.view.nightMode}
+        />
       </OrientationHandler>
     </View>
   );
@@ -363,6 +385,8 @@ function SettingsModal({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.settingsOverlay}>
         <View style={[styles.settingsContent, nightMode && styles.settingsContentNight]}>
+          {/* Drag Handle */}
+          <View style={styles.dragHandle} />
           <View style={styles.settingsHeader}>
             <Text style={[styles.settingsTitle, { color: textColor }]}>Settings</Text>
             <TouchableOpacity onPress={onClose}>
@@ -370,81 +394,105 @@ function SettingsModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.settingsBody}>
-            {/* Display Section */}
-            <Text style={[styles.settingsSectionTitle, { color: textColor }]}>Display</Text>
+          <ScrollView style={styles.settingsBody} showsVerticalScrollIndicator={false}>
+            {/* UI Elements Section */}
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeader}>
+                <Ionicons name="eye-outline" size={18} color={accentColor} />
+                <Text style={[styles.settingsSectionTitle, { color: textColor }]}>UI Elements</Text>
+              </View>
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Show Constellation Lines
-              </Text>
-              <Switch
-                value={settings.view.showConstellations}
-                onValueChange={(value) => onUpdateView({ showConstellations: value })}
-                trackColor={{ false: '#333', true: accentColor }}
-                thumbColor="#fff"
-              />
-            </View>
+              <View style={styles.settingsCard}>
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelContainer}>
+                    <Text style={[styles.settingsLabel, { color: textColor }]}>Constellations</Text>
+                    <Text style={[styles.settingsHint, { color: textColor }]}>Show constellation lines</Text>
+                  </View>
+                  <Switch
+                    value={settings.view.showConstellations}
+                    onValueChange={(value) => onUpdateView({ showConstellations: value })}
+                    trackColor={{ false: '#333', true: accentColor }}
+                    thumbColor="#fff"
+                  />
+                </View>
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Show Labels
-              </Text>
-              <Switch
-                value={settings.view.showLabels}
-                onValueChange={(value) => onUpdateView({ showLabels: value })}
-                trackColor={{ false: '#333', true: accentColor }}
-                thumbColor="#fff"
-              />
-            </View>
+                <View style={styles.settingsDivider} />
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Show Compass
-              </Text>
-              <Switch
-                value={settings.view.showCompass}
-                onValueChange={(value) => onUpdateView({ showCompass: value })}
-                trackColor={{ false: '#333', true: accentColor }}
-                thumbColor="#fff"
-              />
-            </View>
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelContainer}>
+                    <Text style={[styles.settingsLabel, { color: textColor }]}>Labels</Text>
+                    <Text style={[styles.settingsHint, { color: textColor }]}>Show star and constellation names</Text>
+                  </View>
+                  <Switch
+                    value={settings.view.showLabels}
+                    onValueChange={(value) => onUpdateView({ showLabels: value })}
+                    trackColor={{ false: '#333', true: accentColor }}
+                    thumbColor="#fff"
+                  />
+                </View>
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Show Info Bar
-              </Text>
-              <Switch
-                value={settings.view.showInfo}
-                onValueChange={(value) => onUpdateView({ showInfo: value })}
-                trackColor={{ false: '#333', true: accentColor }}
-                thumbColor="#fff"
-              />
-            </View>
+                <View style={styles.settingsDivider} />
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Night Mode (Red UI)
-              </Text>
-              <Switch
-                value={settings.view.nightMode}
-                onValueChange={(value) => onUpdateView({ nightMode: value })}
-                trackColor={{ false: '#333', true: accentColor }}
-                thumbColor="#fff"
-              />
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelContainer}>
+                    <Text style={[styles.settingsLabel, { color: textColor }]}>Compass</Text>
+                    <Text style={[styles.settingsHint, { color: textColor }]}>Show direction indicator</Text>
+                  </View>
+                  <Switch
+                    value={settings.view.showCompass}
+                    onValueChange={(value) => onUpdateView({ showCompass: value })}
+                    trackColor={{ false: '#333', true: accentColor }}
+                    thumbColor="#fff"
+                  />
+                </View>
+
+                <View style={styles.settingsDivider} />
+
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelContainer}>
+                    <Text style={[styles.settingsLabel, { color: textColor }]}>Info Bar</Text>
+                    <Text style={[styles.settingsHint, { color: textColor }]}>Show location and time</Text>
+                  </View>
+                  <Switch
+                    value={settings.view.showInfo}
+                    onValueChange={(value) => onUpdateView({ showInfo: value })}
+                    trackColor={{ false: '#333', true: accentColor }}
+                    thumbColor="#fff"
+                  />
+                </View>
+
+                <View style={styles.settingsDivider} />
+
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLabelContainer}>
+                    <Text style={[styles.settingsLabel, { color: textColor }]}>Night Mode</Text>
+                    <Text style={[styles.settingsHint, { color: textColor }]}>Red UI to preserve dark adaptation</Text>
+                  </View>
+                  <Switch
+                    value={settings.view.nightMode}
+                    onValueChange={(value) => onUpdateView({ nightMode: value })}
+                    trackColor={{ false: '#333', true: accentColor }}
+                    thumbColor="#fff"
+                  />
+                </View>
+              </View>
             </View>
 
             {/* Star Visibility Section */}
-            <Text style={[styles.settingsSectionTitle, { color: textColor }]}>
-              Star Visibility
-            </Text>
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeader}>
+                <Ionicons name="star-outline" size={18} color={accentColor} />
+                <Text style={[styles.settingsSectionTitle, { color: textColor }]}>Star Visibility</Text>
+              </View>
 
-            <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: textColor }]}>
-                Magnitude Limit: {settings.view.magnitudeLimit.toFixed(1)}
-              </Text>
-            </View>
-            <View style={styles.magnitudeButtons}>
+              <View style={styles.settingsCard}>
+                <Text style={[styles.settingsCardLabel, { color: textColor }]}>
+                  Magnitude Limit: {settings.view.magnitudeLimit.toFixed(1)}
+                </Text>
+                <Text style={[styles.settingsCardHint, { color: textColor }]}>
+                  Lower values show only bright stars. Higher values show fainter stars.
+                </Text>
+                <View style={styles.magnitudeButtons}>
               {[3.0, 4.0, 5.0, 5.5, 6.0].map((mag) => (
                 <TouchableOpacity
                   key={mag}
@@ -466,45 +514,218 @@ function SettingsModal({
                   </Text>
                 </TouchableOpacity>
               ))}
+                </View>
+              </View>
             </View>
 
             {/* Field of View Section */}
-            <Text style={[styles.settingsSectionTitle, { color: textColor }]}>
-              Field of View
-            </Text>
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeader}>
+                <Ionicons name="scan-outline" size={18} color={accentColor} />
+                <Text style={[styles.settingsSectionTitle, { color: textColor }]}>Field of View</Text>
+              </View>
 
-            <View style={styles.fovButtons}>
-              {[30, 45, 60, 90, 120].map((fov) => (
-                <TouchableOpacity
-                  key={fov}
-                  style={[
-                    styles.fovButton,
-                    settings.view.fieldOfView === fov && {
-                      backgroundColor: accentColor,
-                    },
-                  ]}
-                  onPress={() => onUpdateView({ fieldOfView: fov })}
-                >
-                  <Text
-                    style={[
-                      styles.fovButtonText,
-                      settings.view.fieldOfView === fov && { color: '#000' },
-                    ]}
-                  >
-                    {fov}°
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <View style={styles.settingsCard}>
+                <Text style={[styles.settingsCardLabel, { color: textColor }]}>
+                  Current: {settings.view.fieldOfView}°
+                </Text>
+                <Text style={[styles.settingsCardHint, { color: textColor }]}>
+                  Narrow (30°) for detail, wide (120°) for overview.
+                </Text>
+                <View style={styles.fovButtons}>
+                  {[30, 45, 60, 90, 120].map((fov) => (
+                    <TouchableOpacity
+                      key={fov}
+                      style={[
+                        styles.fovButton,
+                        settings.view.fieldOfView === fov && {
+                          backgroundColor: accentColor,
+                        },
+                      ]}
+                      onPress={() => onUpdateView({ fieldOfView: fov })}
+                    >
+                      <Text
+                        style={[
+                          styles.fovButtonText,
+                          settings.view.fieldOfView === fov && { color: '#000' },
+                        ]}
+                      >
+                        {fov}°
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
 
             {/* About Section */}
-            <Text style={[styles.settingsSectionTitle, { color: textColor }]}>About</Text>
-            <Text style={[styles.aboutText, { color: textColor }]}>
-              Star Map v1.0.0{'\n'}
-              Astronomical calculations using J2000 epoch coordinates.{'\n'}
-              Star data from Hipparcos Catalog.
-            </Text>
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeader}>
+                <Ionicons name="information-circle-outline" size={18} color={accentColor} />
+                <Text style={[styles.settingsSectionTitle, { color: textColor }]}>About</Text>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={[styles.aboutText, { color: textColor }]}>
+                  Star Map v1.0.0{'\n\n'}
+                  Astronomical calculations using J2000 epoch coordinates.{'\n\n'}
+                  Star data from Hipparcos Catalog.
+                </Text>
+              </View>
+            </View>
           </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/**
+ * Search Modal Component
+ * Allows users to search for stars by name or constellation
+ */
+interface SearchModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectStar: (star: Star) => void;
+  nightMode: boolean;
+}
+
+function SearchModal({
+  visible,
+  onClose,
+  onSelectStar,
+  nightMode,
+}: SearchModalProps): JSX.Element {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Star[]>([]);
+  const [allStars, setAllStars] = useState<Star[]>([]);
+
+  const textColor = nightMode ? '#ff6666' : '#ffffff';
+  const accentColor = nightMode ? '#ff6666' : '#4488ff';
+
+  // Load stars when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      starCatalog.load().then(() => {
+        const stars = starCatalog.getStarsByMagnitude(6.0);
+        setAllStars(stars);
+        // Show popular stars initially
+        const popularStars = stars
+          .filter(s => s.name)
+          .sort((a, b) => a.magnitude - b.magnitude)
+          .slice(0, 20);
+        setSearchResults(popularStars);
+      });
+    }
+  }, [visible]);
+
+  // Filter stars based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      // Show popular named stars when no search
+      const popularStars = allStars
+        .filter(s => s.name)
+        .sort((a, b) => a.magnitude - b.magnitude)
+        .slice(0, 20);
+      setSearchResults(popularStars);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const results = allStars
+      .filter(star => {
+        const nameMatch = star.name?.toLowerCase().includes(query);
+        const constellationMatch = star.constellation?.toLowerCase().includes(query);
+        return nameMatch || constellationMatch;
+      })
+      .sort((a, b) => a.magnitude - b.magnitude)
+      .slice(0, 30);
+
+    setSearchResults(results);
+  }, [searchQuery, allStars]);
+
+  const handleSelectStar = useCallback((star: Star) => {
+    Keyboard.dismiss();
+    onSelectStar(star);
+  }, [onSelectStar]);
+
+  const renderStarItem = useCallback(({ item }: { item: Star }) => (
+    <TouchableOpacity
+      style={styles.searchResultItem}
+      onPress={() => handleSelectStar(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.searchResultContent}>
+        <Text style={[styles.searchResultName, { color: textColor }]}>
+          {item.name || `HIP ${item.id}`}
+        </Text>
+        <Text style={[styles.searchResultDetails, { color: textColor }]}>
+          {item.constellation ? `${item.constellation} • ` : ''}
+          Mag {item.magnitude.toFixed(1)}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={textColor} style={{ opacity: 0.5 }} />
+    </TouchableOpacity>
+  ), [textColor, handleSelectStar]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.searchOverlay}>
+        <View style={[styles.searchContent, nightMode && styles.searchContentNight]}>
+          {/* Drag Handle */}
+          <View style={styles.dragHandle} />
+
+          {/* Header */}
+          <View style={styles.searchHeader}>
+            <Text style={[styles.searchTitle, { color: textColor }]}>Find a Star</Text>
+            <TouchableOpacity onPress={onClose} style={styles.searchCloseButton}>
+              <Ionicons name="close" size={24} color={textColor} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Input */}
+          <View style={[styles.searchInputContainer, nightMode && styles.searchInputContainerNight]}>
+            <Ionicons name="search" size={20} color={nightMode ? '#ff6666' : '#888888'} />
+            <TextInput
+              style={[styles.searchInput, { color: textColor }]}
+              placeholder="Search by star name or constellation..."
+              placeholderTextColor={nightMode ? '#993333' : '#666666'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={nightMode ? '#993333' : '#666666'} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Results hint */}
+          <Text style={[styles.searchHint, { color: textColor }]}>
+            {searchQuery ? `${searchResults.length} results` : 'Popular stars'}
+          </Text>
+
+          {/* Results List */}
+          <FlatList
+            data={searchResults}
+            renderItem={renderStarItem}
+            keyExtractor={(item) => String(item.id)}
+            style={styles.searchResultsList}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.searchEmpty}>
+                <Ionicons name="star-outline" size={48} color={nightMode ? '#993333' : '#333333'} />
+                <Text style={[styles.searchEmptyText, { color: textColor }]}>
+                  No stars found matching "{searchQuery}"
+                </Text>
+              </View>
+            }
+          />
         </View>
       </View>
     </Modal>
@@ -620,18 +841,23 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
   toolbarButton: {
     alignItems: 'center',
-    padding: 8,
-    minWidth: 60,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: 64,
+    minHeight: 56,
+    borderRadius: 12,
   },
   toolbarButtonText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 4,
+    fontWeight: '500',
   },
   toolbarButtonInactive: {
     color: '#666666',
@@ -664,23 +890,60 @@ const styles = StyleSheet.create({
   },
   settingsBody: {
     padding: 20,
+    paddingTop: 8,
+  },
+  settingsSection: {
+    marginBottom: 20,
+  },
+  settingsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   settingsSectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 12,
     textTransform: 'uppercase',
-    opacity: 0.7,
+    marginLeft: 8,
+    opacity: 0.8,
+  },
+  settingsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
   },
   settingsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
+  },
+  settingsLabelContainer: {
+    flex: 1,
+    marginRight: 16,
   },
   settingsLabel: {
     fontSize: 16,
+  },
+  settingsHint: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
+  },
+  settingsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 8,
+  },
+  settingsCardLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  settingsCardHint: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginBottom: 12,
   },
   magnitudeButtons: {
     flexDirection: 'row',
@@ -717,5 +980,107 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     lineHeight: 20,
     marginBottom: 40,
+  },
+  // Drag handle for modals
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  // Search Modal styles
+  searchOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  searchContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    minHeight: '60%',
+  },
+  searchContentNight: {
+    backgroundColor: '#1a0a0a',
+  },
+  searchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  searchTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  searchCloseButton: {
+    padding: 4,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.3)',
+  },
+  searchInputContainerNight: {
+    borderColor: 'rgba(255, 102, 102, 0.3)',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  searchHint: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  searchResultsList: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchResultContent: {
+    flex: 1,
+  },
+  searchResultName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  searchResultDetails: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  searchEmpty: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  searchEmptyText: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginTop: 16,
+    textAlign: 'center',
   },
 });

@@ -62,6 +62,8 @@ interface StarMapProps {
   onStarSelect?: (star: VisibleStar) => void;
   onViewChange?: (view: ViewDirection) => void;
   onPanelVisibilityChange?: (isVisible: boolean) => void;
+  targetStar?: Star | null;
+  onTargetStarReached?: () => void;
 }
 
 // Extended star data with position for click detection
@@ -405,7 +407,7 @@ function StarInfoPanel({ star, onClose }: StarInfoPanelProps) {
       <View style={infoStyles.panel}>
         <View style={infoStyles.header}>
           <View style={[infoStyles.colorDot, { backgroundColor: starColor }]} />
-          <Text style={infoStyles.title}>{star.name || `HIP ${star.hipId}` || 'Unknown Star'}</Text>
+          <Text style={infoStyles.title}>{star.name || `HIP ${star.id}` || 'Unknown Star'}</Text>
           <TouchableOpacity onPress={onClose} style={infoStyles.closeButton}>
             <Text style={infoStyles.closeText}>×</Text>
           </TouchableOpacity>
@@ -464,11 +466,6 @@ function StarInfoPanel({ star, onClose }: StarInfoPanelProps) {
               </View>
             </>
           )}
-
-          {/* Close Button */}
-          <TouchableOpacity style={infoStyles.closeButtonLarge} onPress={onClose}>
-            <Text style={infoStyles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -511,12 +508,15 @@ const infoStyles = StyleSheet.create({
     fontWeight: 'bold',
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
   },
   closeText: {
-    color: '#888888',
-    fontSize: 24,
+    color: '#ffffff',
+    fontSize: 20,
     fontWeight: 'bold',
+    lineHeight: 20,
   },
   content: {
     padding: 16,
@@ -547,19 +547,6 @@ const infoStyles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  closeButtonLarge: {
-    backgroundColor: '#4488ff',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  closeButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });
 
 /**
@@ -573,6 +560,8 @@ export function StarMap({
   onStarSelect,
   onViewChange,
   onPanelVisibilityChange,
+  targetStar,
+  onTargetStarReached,
 }: StarMapProps) {
   const [stars, setStars] = useState<Star[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -609,6 +598,48 @@ export function StarMap({
 
     onViewChange({ azimuth, altitude });
   }, [manualOffset, pointing, onViewChange]);
+
+  // Navigate to target star when selected from search
+  useEffect(() => {
+    if (!targetStar || !location) return;
+
+    // Convert target star's equatorial coordinates to horizontal
+    const horizontal = equatorialToHorizontal(
+      targetStar.coordinates,
+      location,
+      observationTime
+    );
+
+    // Calculate the offset needed to center on this star
+    // We need to subtract any device pointing from our calculation
+    let targetAzimuth = horizontal.azimuth;
+    let targetAltitude = horizontal.altitude;
+
+    if (pointing) {
+      targetAzimuth -= pointing.pointing.azimuth;
+      targetAltitude -= pointing.pointing.altitude;
+    }
+
+    // Set manual offset to point at target star
+    setManualOffset({
+      azimuth: targetAzimuth,
+      altitude: Math.max(-89, Math.min(89, targetAltitude)),
+    });
+
+    // Find the rendered star data and select it
+    const cartesian = horizontalToCartesian(horizontal, CELESTIAL_SPHERE_RADIUS);
+    const renderedStar: RenderedStar = {
+      ...targetStar,
+      position: new THREE.Vector3(cartesian.x, cartesian.y, cartesian.z),
+      horizontal,
+    };
+    setSelectedStar(renderedStar);
+
+    // Notify parent that we've reached the target
+    if (onTargetStarReached) {
+      onTargetStarReached();
+    }
+  }, [targetStar, location, observationTime, pointing, onTargetStarReached]);
 
   // Track if we're currently dragging
   const isDragging = useRef(false);
