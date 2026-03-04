@@ -392,6 +392,7 @@ export default function App(): JSX.Element {
         <WhatsUpModal
           visible={showWhatsUp}
           onClose={() => setShowWhatsUp(false)}
+          onShowEvents={() => setShowEvents(true)}
           location={location}
           observationTime={observationTime}
           nightMode={settings.view.nightMode}
@@ -951,6 +952,7 @@ function TimeTravelModal({
 interface WhatsUpModalProps {
   visible: boolean;
   onClose: () => void;
+  onShowEvents: () => void;
   location: GeographicCoordinates | null;
   observationTime: Date;
   nightMode: boolean;
@@ -1057,6 +1059,7 @@ function getVisiblePlanets(date: Date): PlanetInfo[] {
 function WhatsUpModal({
   visible,
   onClose,
+  onShowEvents,
   location,
   observationTime,
   nightMode,
@@ -1143,6 +1146,26 @@ function WhatsUpModal({
                 </Text>
               )}
             </View>
+
+            {/* Upcoming Events Link */}
+            <TouchableOpacity
+              style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}
+              onPress={() => {
+                onClose();
+                onShowEvents();
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.whatsUpCardHeader}>
+                <Ionicons name="calendar" size={24} color={accentColor} />
+                <Text style={[styles.whatsUpCardTitle, { color: textColor }]}>Upcoming Events</Text>
+                <View style={{ flex: 1 }} />
+                <Ionicons name="chevron-forward" size={20} color={textColor} style={{ opacity: 0.5 }} />
+              </View>
+              <Text style={[styles.whatsUpCardDescription, { color: textColor }]}>
+                Meteor showers, eclipses, and astronomical events
+              </Text>
+            </TouchableOpacity>
 
             {/* Viewing Tips */}
             <View style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}>
