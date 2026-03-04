@@ -25,9 +25,10 @@ import {
   TextInput,
   FlatList,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { format, addHours, addDays, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
 
 import {
   GeographicCoordinates,
@@ -90,6 +91,8 @@ export default function App(): JSX.Element {
   const [showInfo, setShowInfo] = useState(false);
   const [isStarPanelVisible, setIsStarPanelVisible] = useState(false);
   const [targetStar, setTargetStar] = useState<Star | null>(null);
+  const [showTimeTravel, setShowTimeTravel] = useState(false);
+  const [showWhatsUp, setShowWhatsUp] = useState(false);
 
   // Update observation time
   useEffect(() => {
@@ -126,6 +129,24 @@ export default function App(): JSX.Element {
   const handleSearchSelectStar = useCallback((star: Star) => {
     setTargetStar(star);
     setShowSearch(false);
+  }, []);
+
+  // Handle time travel - set custom observation time
+  const handleSetCustomTime = useCallback((newTime: Date) => {
+    setObservationTime(newTime);
+    setSettings((prev) => ({
+      ...prev,
+      time: { ...prev.time, useRealTime: false },
+    }));
+  }, []);
+
+  // Reset to real time
+  const handleResetToRealTime = useCallback(() => {
+    setObservationTime(new Date());
+    setSettings((prev) => ({
+      ...prev,
+      time: { ...prev.time, useRealTime: true },
+    }));
   }, []);
 
   // Update view settings
@@ -191,17 +212,17 @@ export default function App(): JSX.Element {
                 </Text>
               </View>
 
-              {/* Time */}
-              <View style={styles.infoItem}>
+              {/* Time (tappable to open time travel) */}
+              <TouchableOpacity style={styles.infoItem} onPress={() => setShowTimeTravel(true)}>
                 <Ionicons
-                  name="time-outline"
+                  name={settings.time.useRealTime ? 'time-outline' : 'time'}
                   size={14}
                   color={settings.view.nightMode ? '#ff6666' : '#88aaff'}
                 />
-                <Text style={[styles.infoText, nightModeStyle]}>
+                <Text style={[styles.infoText, nightModeStyle, !settings.time.useRealTime && styles.timeTravelActive]}>
                   {format(observationTime, 'HH:mm:ss')}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Sidereal Time */}
               {siderealTime && (
@@ -296,14 +317,14 @@ export default function App(): JSX.Element {
 
             <TouchableOpacity
               style={styles.toolbarButton}
-              onPress={() => setShowEvents(true)}
+              onPress={() => setShowWhatsUp(true)}
             >
               <Ionicons
-                name="calendar"
+                name="telescope"
                 size={24}
                 color={settings.view.nightMode ? '#ff6666' : '#ffffff'}
               />
-              <Text style={[styles.toolbarButtonText, nightModeStyle]}>Events</Text>
+              <Text style={[styles.toolbarButtonText, nightModeStyle]}>Tonight</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -355,6 +376,42 @@ export default function App(): JSX.Element {
           onSelectStar={handleSearchSelectStar}
           nightMode={settings.view.nightMode}
         />
+
+        {/* Time Travel Modal */}
+        <TimeTravelModal
+          visible={showTimeTravel}
+          onClose={() => setShowTimeTravel(false)}
+          currentTime={observationTime}
+          onSetTime={handleSetCustomTime}
+          onResetToNow={handleResetToRealTime}
+          isRealTime={settings.time.useRealTime}
+          nightMode={settings.view.nightMode}
+        />
+
+        {/* What's Up Tonight Modal */}
+        <WhatsUpModal
+          visible={showWhatsUp}
+          onClose={() => setShowWhatsUp(false)}
+          location={location}
+          observationTime={observationTime}
+          nightMode={settings.view.nightMode}
+        />
+
+        {/* Time Travel Indicator (shown when not in real-time) */}
+        {!settings.time.useRealTime && (
+          <TouchableOpacity
+            style={[styles.timeTravelIndicator, settings.view.nightMode && styles.timeTravelIndicatorNight]}
+            onPress={() => setShowTimeTravel(true)}
+          >
+            <Ionicons name="time" size={16} color={settings.view.nightMode ? '#ff6666' : '#4488ff'} />
+            <Text style={[styles.timeTravelIndicatorText, settings.view.nightMode && { color: '#ff6666' }]}>
+              {format(observationTime, 'MMM d, yyyy HH:mm')}
+            </Text>
+            <TouchableOpacity onPress={handleResetToRealTime} style={styles.timeTravelResetButton}>
+              <Ionicons name="refresh" size={14} color={settings.view.nightMode ? '#ff6666' : '#ffffff'} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </OrientationHandler>
     </View>
   );
@@ -732,6 +789,395 @@ function SearchModal({
   );
 }
 
+/**
+ * Time Travel Modal Component
+ * Allows users to change observation date/time
+ */
+interface TimeTravelModalProps {
+  visible: boolean;
+  onClose: () => void;
+  currentTime: Date;
+  onSetTime: (time: Date) => void;
+  onResetToNow: () => void;
+  isRealTime: boolean;
+  nightMode: boolean;
+}
+
+function TimeTravelModal({
+  visible,
+  onClose,
+  currentTime,
+  onSetTime,
+  onResetToNow,
+  isRealTime,
+  nightMode,
+}: TimeTravelModalProps): JSX.Element {
+  const textColor = nightMode ? '#ff6666' : '#ffffff';
+  const accentColor = nightMode ? '#ff6666' : '#4488ff';
+
+  // Quick time jumps
+  const timeJumps = [
+    { label: '-1 month', delta: () => addDays(currentTime, -30) },
+    { label: '-1 week', delta: () => addDays(currentTime, -7) },
+    { label: '-1 day', delta: () => addDays(currentTime, -1) },
+    { label: '-1 hour', delta: () => addHours(currentTime, -1) },
+    { label: '+1 hour', delta: () => addHours(currentTime, 1) },
+    { label: '+1 day', delta: () => addDays(currentTime, 1) },
+    { label: '+1 week', delta: () => addDays(currentTime, 7) },
+    { label: '+1 month', delta: () => addDays(currentTime, 30) },
+  ];
+
+  // Time of day presets
+  const timePresets = [
+    { label: 'Sunset', hour: 19, minute: 0 },
+    { label: 'Dusk', hour: 21, minute: 0 },
+    { label: 'Midnight', hour: 0, minute: 0 },
+    { label: 'Dawn', hour: 5, minute: 0 },
+  ];
+
+  const handleTimePreset = (hour: number, minute: number) => {
+    let newTime = setHours(currentTime, hour);
+    newTime = setMinutes(newTime, minute);
+    onSetTime(newTime);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.searchOverlay}>
+        <View style={[styles.searchContent, nightMode && styles.searchContentNight, { minHeight: '50%' }]}>
+          <View style={styles.dragHandle} />
+
+          <View style={styles.searchHeader}>
+            <Text style={[styles.searchTitle, { color: textColor }]}>Time Travel</Text>
+            <TouchableOpacity onPress={onClose} style={styles.searchCloseButton}>
+              <Ionicons name="close" size={24} color={textColor} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+            {/* Current Time Display */}
+            <View style={[styles.timeTravelCurrentTime, nightMode && { borderColor: 'rgba(255, 102, 102, 0.3)' }]}>
+              <Text style={[styles.timeTravelDateDisplay, { color: textColor }]}>
+                {format(currentTime, 'EEEE, MMMM d, yyyy')}
+              </Text>
+              <Text style={[styles.timeTravelTimeDisplay, { color: accentColor }]}>
+                {format(currentTime, 'HH:mm:ss')}
+              </Text>
+              {!isRealTime && (
+                <View style={styles.timeTravelBadge}>
+                  <Ionicons name="time" size={12} color={accentColor} />
+                  <Text style={[styles.timeTravelBadgeText, { color: accentColor }]}>Time Travel Active</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Reset to Now Button */}
+            <TouchableOpacity
+              style={[styles.timeTravelResetNow, { borderColor: accentColor }]}
+              onPress={() => {
+                onResetToNow();
+                onClose();
+              }}
+            >
+              <Ionicons name="refresh" size={18} color={accentColor} />
+              <Text style={[styles.timeTravelResetNowText, { color: accentColor }]}>
+                {isRealTime ? 'Currently showing real time' : 'Return to Now'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Time Jumps */}
+            <Text style={[styles.timeTravelSectionTitle, { color: textColor }]}>Jump By</Text>
+            <View style={styles.timeTravelJumps}>
+              {timeJumps.map((jump, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.timeTravelJumpButton, { borderColor: accentColor }]}
+                  onPress={() => onSetTime(jump.delta())}
+                >
+                  <Text style={[styles.timeTravelJumpText, { color: textColor }]}>{jump.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Time of Day Presets */}
+            <Text style={[styles.timeTravelSectionTitle, { color: textColor }]}>Time of Day</Text>
+            <View style={styles.timeTravelPresets}>
+              {timePresets.map((preset, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.timeTravelPresetButton, { backgroundColor: accentColor }]}
+                  onPress={() => handleTimePreset(preset.hour, preset.minute)}
+                >
+                  <Text style={styles.timeTravelPresetText}>{preset.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Quick Date Access */}
+            <Text style={[styles.timeTravelSectionTitle, { color: textColor }]}>Quick Dates</Text>
+            <View style={styles.timeTravelPresets}>
+              <TouchableOpacity
+                style={[styles.timeTravelPresetButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
+                onPress={() => onSetTime(startOfDay(new Date()))}
+              >
+                <Text style={[styles.timeTravelPresetText, { color: textColor }]}>Today</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.timeTravelPresetButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
+                onPress={() => onSetTime(addDays(startOfDay(new Date()), 1))}
+              >
+                <Text style={[styles.timeTravelPresetText, { color: textColor }]}>Tomorrow</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.timeTravelPresetButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
+                onPress={() => onSetTime(addDays(startOfDay(new Date()), 7))}
+              >
+                <Text style={[styles.timeTravelPresetText, { color: textColor }]}>Next Week</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/**
+ * What's Up Tonight Modal Component
+ * Shows summary of visible celestial objects
+ */
+interface WhatsUpModalProps {
+  visible: boolean;
+  onClose: () => void;
+  location: GeographicCoordinates | null;
+  observationTime: Date;
+  nightMode: boolean;
+}
+
+// Moon phase calculation
+function getMoonPhase(date: Date): { phase: string; illumination: number; emoji: string } {
+  // Simplified moon phase calculation
+  const lunarCycle = 29.53059;
+  const knownNewMoon = new Date('2000-01-06T18:14:00Z').getTime();
+  const daysSinceNewMoon = (date.getTime() - knownNewMoon) / (1000 * 60 * 60 * 24);
+  const currentCycleDay = daysSinceNewMoon % lunarCycle;
+  const phasePercent = currentCycleDay / lunarCycle;
+
+  let phase: string;
+  let emoji: string;
+
+  if (phasePercent < 0.03 || phasePercent > 0.97) {
+    phase = 'New Moon';
+    emoji = '🌑';
+  } else if (phasePercent < 0.22) {
+    phase = 'Waxing Crescent';
+    emoji = '🌒';
+  } else if (phasePercent < 0.28) {
+    phase = 'First Quarter';
+    emoji = '🌓';
+  } else if (phasePercent < 0.47) {
+    phase = 'Waxing Gibbous';
+    emoji = '🌔';
+  } else if (phasePercent < 0.53) {
+    phase = 'Full Moon';
+    emoji = '🌕';
+  } else if (phasePercent < 0.72) {
+    phase = 'Waning Gibbous';
+    emoji = '🌖';
+  } else if (phasePercent < 0.78) {
+    phase = 'Last Quarter';
+    emoji = '🌗';
+  } else {
+    phase = 'Waning Crescent';
+    emoji = '🌘';
+  }
+
+  // Calculate illumination (0-100%)
+  const illumination = Math.round((1 - Math.cos(phasePercent * 2 * Math.PI)) * 50);
+
+  return { phase, illumination, emoji };
+}
+
+// Planet visibility data (simplified - positions vary throughout year)
+interface PlanetInfo {
+  name: string;
+  symbol: string;
+  magnitude: number;
+  visible: boolean;
+  description: string;
+}
+
+function getVisiblePlanets(date: Date): PlanetInfo[] {
+  const month = date.getMonth();
+  const hour = date.getHours();
+  const isNight = hour >= 20 || hour <= 5;
+
+  // Simplified planet visibility - in reality this requires ephemeris calculations
+  return [
+    {
+      name: 'Mercury',
+      symbol: '☿',
+      magnitude: -0.4,
+      visible: isNight && (month === 2 || month === 5 || month === 9),
+      description: 'Best seen near horizon after sunset or before sunrise',
+    },
+    {
+      name: 'Venus',
+      symbol: '♀',
+      magnitude: -4.4,
+      visible: isNight && (month >= 1 && month <= 5),
+      description: 'The brightest planet, often called the Evening/Morning Star',
+    },
+    {
+      name: 'Mars',
+      symbol: '♂',
+      magnitude: 0.7,
+      visible: isNight && (month >= 6 && month <= 11),
+      description: 'The Red Planet, visible with distinctive orange hue',
+    },
+    {
+      name: 'Jupiter',
+      symbol: '♃',
+      magnitude: -2.5,
+      visible: isNight,
+      description: 'The largest planet, very bright and easy to spot',
+    },
+    {
+      name: 'Saturn',
+      symbol: '♄',
+      magnitude: 0.5,
+      visible: isNight && (month >= 4 && month <= 10),
+      description: 'Famous for its rings, visible through telescope',
+    },
+  ];
+}
+
+function WhatsUpModal({
+  visible,
+  onClose,
+  location,
+  observationTime,
+  nightMode,
+}: WhatsUpModalProps): JSX.Element {
+  const textColor = nightMode ? '#ff6666' : '#ffffff';
+  const accentColor = nightMode ? '#ff6666' : '#4488ff';
+
+  const moonInfo = getMoonPhase(observationTime);
+  const planets = getVisiblePlanets(observationTime);
+  const visiblePlanets = planets.filter(p => p.visible);
+
+  const hour = observationTime.getHours();
+  const isNightTime = hour >= 20 || hour <= 5;
+  const isDusk = hour >= 17 && hour < 20;
+  const isDawn = hour >= 5 && hour < 7;
+
+  let skyCondition = 'Daylight';
+  if (isNightTime) skyCondition = 'Night Sky';
+  else if (isDusk) skyCondition = 'Dusk';
+  else if (isDawn) skyCondition = 'Dawn';
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.searchOverlay}>
+        <View style={[styles.searchContent, nightMode && styles.searchContentNight, { minHeight: '70%' }]}>
+          <View style={styles.dragHandle} />
+
+          <View style={styles.searchHeader}>
+            <Text style={[styles.searchTitle, { color: textColor }]}>Tonight's Sky</Text>
+            <TouchableOpacity onPress={onClose} style={styles.searchCloseButton}>
+              <Ionicons name="close" size={24} color={textColor} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+            {/* Sky Condition */}
+            <View style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}>
+              <View style={styles.whatsUpCardHeader}>
+                <Ionicons name="partly-sunny" size={24} color={accentColor} />
+                <Text style={[styles.whatsUpCardTitle, { color: textColor }]}>Current Conditions</Text>
+              </View>
+              <Text style={[styles.whatsUpCardValue, { color: accentColor }]}>{skyCondition}</Text>
+              <Text style={[styles.whatsUpCardDescription, { color: textColor }]}>
+                {format(observationTime, 'EEEE, MMMM d')} at {format(observationTime, 'h:mm a')}
+              </Text>
+            </View>
+
+            {/* Moon Phase */}
+            <View style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}>
+              <View style={styles.whatsUpCardHeader}>
+                <Text style={{ fontSize: 24 }}>{moonInfo.emoji}</Text>
+                <Text style={[styles.whatsUpCardTitle, { color: textColor }]}>Moon Phase</Text>
+              </View>
+              <Text style={[styles.whatsUpCardValue, { color: accentColor }]}>{moonInfo.phase}</Text>
+              <Text style={[styles.whatsUpCardDescription, { color: textColor }]}>
+                {moonInfo.illumination}% illuminated
+              </Text>
+            </View>
+
+            {/* Visible Planets */}
+            <View style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}>
+              <View style={styles.whatsUpCardHeader}>
+                <Ionicons name="planet" size={24} color={accentColor} />
+                <Text style={[styles.whatsUpCardTitle, { color: textColor }]}>Visible Planets</Text>
+              </View>
+              {visiblePlanets.length > 0 ? (
+                visiblePlanets.map((planet, index) => (
+                  <View key={index} style={styles.whatsUpPlanetItem}>
+                    <View style={styles.whatsUpPlanetHeader}>
+                      <Text style={[styles.whatsUpPlanetSymbol, { color: accentColor }]}>{planet.symbol}</Text>
+                      <Text style={[styles.whatsUpPlanetName, { color: textColor }]}>{planet.name}</Text>
+                      <Text style={[styles.whatsUpPlanetMag, { color: textColor }]}>
+                        mag {planet.magnitude > 0 ? '+' : ''}{planet.magnitude.toFixed(1)}
+                      </Text>
+                    </View>
+                    <Text style={[styles.whatsUpPlanetDescription, { color: textColor }]}>
+                      {planet.description}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.whatsUpCardDescription, { color: textColor }]}>
+                  {isNightTime ? 'No bright planets currently visible' : 'Wait for nightfall to see planets'}
+                </Text>
+              )}
+            </View>
+
+            {/* Viewing Tips */}
+            <View style={[styles.whatsUpCard, nightMode && { borderColor: 'rgba(255, 102, 102, 0.2)' }]}>
+              <View style={styles.whatsUpCardHeader}>
+                <Ionicons name="bulb" size={24} color={accentColor} />
+                <Text style={[styles.whatsUpCardTitle, { color: textColor }]}>Viewing Tips</Text>
+              </View>
+              <View style={styles.whatsUpTip}>
+                <Ionicons name="checkmark-circle" size={16} color={accentColor} />
+                <Text style={[styles.whatsUpTipText, { color: textColor }]}>
+                  {moonInfo.illumination < 30 ? 'Great night for stargazing - low moon illumination' : 'Bright moon may wash out faint stars'}
+                </Text>
+              </View>
+              <View style={styles.whatsUpTip}>
+                <Ionicons name="checkmark-circle" size={16} color={accentColor} />
+                <Text style={[styles.whatsUpTipText, { color: textColor }]}>
+                  Allow 20-30 minutes for your eyes to adapt to darkness
+                </Text>
+              </View>
+              <View style={styles.whatsUpTip}>
+                <Ionicons name="checkmark-circle" size={16} color={accentColor} />
+                <Text style={[styles.whatsUpTipText, { color: textColor }]}>
+                  Use night mode (red UI) to preserve night vision
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1082,5 +1528,191 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     marginTop: 16,
     textAlign: 'center',
+  },
+  // Time Travel styles
+  timeTravelActive: {
+    fontWeight: 'bold',
+  },
+  timeTravelIndicator: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(68, 136, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.3)',
+  },
+  timeTravelIndicatorNight: {
+    backgroundColor: 'rgba(255, 102, 102, 0.2)',
+    borderColor: 'rgba(255, 102, 102, 0.3)',
+  },
+  timeTravelIndicatorText: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  timeTravelResetButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  timeTravelCurrentTime: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.3)',
+    marginBottom: 20,
+  },
+  timeTravelDateDisplay: {
+    fontSize: 16,
+    opacity: 0.8,
+  },
+  timeTravelTimeDisplay: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginTop: 4,
+  },
+  timeTravelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(68, 136, 255, 0.2)',
+    borderRadius: 12,
+  },
+  timeTravelBadgeText: {
+    fontSize: 11,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  timeTravelResetNow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  timeTravelResetNowText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  timeTravelSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    opacity: 0.6,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  timeTravelJumps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  timeTravelJumpButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  timeTravelJumpText: {
+    fontSize: 13,
+  },
+  timeTravelPresets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  timeTravelPresetButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  timeTravelPresetText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // What's Up Tonight styles
+  whatsUpCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.2)',
+  },
+  whatsUpCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  whatsUpCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
+    textTransform: 'uppercase',
+    opacity: 0.8,
+  },
+  whatsUpCardValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  whatsUpCardDescription: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  whatsUpPlanetItem: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  whatsUpPlanetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  whatsUpPlanetSymbol: {
+    fontSize: 20,
+    width: 30,
+  },
+  whatsUpPlanetName: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  whatsUpPlanetMag: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  whatsUpPlanetDescription: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 4,
+    marginLeft: 30,
+  },
+  whatsUpTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  },
+  whatsUpTipText: {
+    fontSize: 13,
+    marginLeft: 8,
+    flex: 1,
+    opacity: 0.8,
   },
 });
