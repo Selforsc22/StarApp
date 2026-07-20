@@ -9,8 +9,9 @@
  * Features:
  * - Grouped by date/category
  * - Priority indicators
- * - Expandable details
+ * - Expandable details with viewing directions
  * - Pull to refresh
+ * - Subscription management
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -35,6 +36,8 @@ import {
   GeographicCoordinates,
 } from '../types';
 import { eventAPI } from '../services/eventAPI';
+import { notificationService, ViewingDirection } from '../services/notificationService';
+import { SubscriptionModal } from './SubscriptionModal';
 
 interface EventListProps {
   location: GeographicCoordinates | null;
@@ -177,14 +180,31 @@ function EventItem({ event, onPress }: EventItemProps): JSX.Element {
 }
 
 /**
- * Event detail modal
+ * Event detail modal with viewing directions
  */
 interface EventDetailModalProps {
   event: AstronomicalEvent | null;
+  location: GeographicCoordinates | null;
   onClose: () => void;
+  onSetReminder: (event: AstronomicalEvent) => void;
 }
 
-function EventDetailModal({ event, onClose }: EventDetailModalProps): JSX.Element | null {
+function EventDetailModal({ event, location, onClose, onSetReminder }: EventDetailModalProps): JSX.Element | null {
+  const [viewingDirection, setViewingDirection] = useState<ViewingDirection | null>(null);
+
+  useEffect(() => {
+    if (event && location) {
+      const direction = notificationService.getViewingDirection(
+        event,
+        location,
+        event.peakTime || event.startTime
+      );
+      setViewingDirection(direction);
+    } else {
+      setViewingDirection(null);
+    }
+  }, [event, location]);
+
   if (!event) return null;
 
   const priorityColor = getPriorityColor(event.priority);
@@ -203,63 +223,151 @@ function EventDetailModal({ event, onClose }: EventDetailModalProps): JSX.Elemen
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody}>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{event.name}</Text>
 
-            <View style={styles.detailRow}>
-              <Ionicons name="calendar-outline" size={16} color="#888888" />
-              <Text style={styles.detailLabel}>Start:</Text>
-              <Text style={styles.detailValue}>
-                {format(event.startTime, 'MMMM d, yyyy')}
-              </Text>
-            </View>
+            {/* Viewing Direction Card */}
+            {viewingDirection && (
+              <View style={styles.viewingDirectionCard}>
+                <View style={styles.viewingDirectionHeader}>
+                  <Ionicons name="compass" size={20} color="#4488ff" />
+                  <Text style={styles.viewingDirectionTitle}>Where to Look</Text>
+                </View>
 
-            {event.endTime && (
+                <View style={styles.viewingDirectionMain}>
+                  <View style={styles.compassDisplay}>
+                    <Text style={styles.compassDirection}>{viewingDirection.compassDirection}</Text>
+                    <Text style={styles.compassDegrees}>{viewingDirection.azimuth.toFixed(0)}°</Text>
+                  </View>
+
+                  <View style={styles.altitudeDisplay}>
+                    <Ionicons
+                      name={viewingDirection.altitude > 45 ? 'arrow-up' : 'arrow-forward'}
+                      size={24}
+                      color="#44ff88"
+                    />
+                    <Text style={styles.altitudeValue}>{viewingDirection.altitude.toFixed(0)}°</Text>
+                    <Text style={styles.altitudeLabel}>altitude</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.viewingDirectionDescription}>
+                  {viewingDirection.description}
+                </Text>
+
+                {!viewingDirection.isVisible && (
+                  <View style={styles.visibilityWarning}>
+                    <Ionicons name="warning" size={16} color="#ffaa00" />
+                    <Text style={styles.visibilityWarningText}>
+                      May not be visible from your current location
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Date & Time Info */}
+            <View style={styles.dateTimeCard}>
               <View style={styles.detailRow}>
                 <Ionicons name="calendar-outline" size={16} color="#888888" />
-                <Text style={styles.detailLabel}>End:</Text>
+                <Text style={styles.detailLabel}>Start:</Text>
                 <Text style={styles.detailValue}>
-                  {format(event.endTime, 'MMMM d, yyyy')}
+                  {format(event.startTime, 'MMMM d, yyyy')}
                 </Text>
               </View>
-            )}
 
-            {event.peakTime && (
-              <View style={styles.detailRow}>
-                <Ionicons name="star-outline" size={16} color="#ffcc00" />
-                <Text style={styles.detailLabel}>Peak:</Text>
-                <Text style={styles.detailValue}>
-                  {format(event.peakTime, 'MMMM d, yyyy')}
-                </Text>
-              </View>
-            )}
+              {event.endTime && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar-outline" size={16} color="#888888" />
+                  <Text style={styles.detailLabel}>End:</Text>
+                  <Text style={styles.detailValue}>
+                    {format(event.endTime, 'MMMM d, yyyy')}
+                  </Text>
+                </View>
+              )}
 
-            {event.intensity && (
-              <View style={styles.detailRow}>
-                <Ionicons name="speedometer-outline" size={16} color="#888888" />
-                <Text style={styles.detailLabel}>
-                  {event.type === 'meteor_shower' ? 'ZHR:' : 'Intensity:'}
-                </Text>
-                <Text style={styles.detailValue}>
-                  {event.type === 'meteor_shower' ? `${event.intensity}/hour` : event.intensity}
-                </Text>
-              </View>
-            )}
+              {event.peakTime && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="star-outline" size={16} color="#ffcc00" />
+                  <Text style={styles.detailLabel}>Peak:</Text>
+                  <Text style={styles.detailValue}>
+                    {format(event.peakTime, 'MMMM d, yyyy h:mm a')}
+                  </Text>
+                </View>
+              )}
 
+              {event.intensity && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="speedometer-outline" size={16} color="#888888" />
+                  <Text style={styles.detailLabel}>
+                    {event.type === 'meteor_shower' ? 'ZHR:' : 'Intensity:'}
+                  </Text>
+                  <Text style={styles.detailValue}>
+                    {event.type === 'meteor_shower' ? `${event.intensity}/hour` : event.intensity}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Description */}
             <View style={styles.descriptionContainer}>
               <Text style={styles.descriptionTitle}>About</Text>
               <Text style={styles.descriptionText}>{event.description}</Text>
             </View>
 
-            {event.infoUrl && (
+            {/* Viewing Tips */}
+            <View style={styles.viewingTipsCard}>
+              <Text style={styles.descriptionTitle}>Viewing Tips</Text>
+              <View style={styles.viewingTip}>
+                <Ionicons name="checkmark-circle" size={16} color="#44ff88" />
+                <Text style={styles.viewingTipText}>
+                  Find a dark location away from city lights
+                </Text>
+              </View>
+              <View style={styles.viewingTip}>
+                <Ionicons name="checkmark-circle" size={16} color="#44ff88" />
+                <Text style={styles.viewingTipText}>
+                  Allow 20-30 minutes for your eyes to adapt
+                </Text>
+              </View>
+              {event.type === 'meteor_shower' && (
+                <View style={styles.viewingTip}>
+                  <Ionicons name="checkmark-circle" size={16} color="#44ff88" />
+                  <Text style={styles.viewingTipText}>
+                    Best viewing after midnight when the radiant is higher
+                  </Text>
+                </View>
+              )}
+              {event.type === 'aurora' && (
+                <View style={styles.viewingTip}>
+                  <Ionicons name="checkmark-circle" size={16} color="#44ff88" />
+                  <Text style={styles.viewingTipText}>
+                    Check for clear skies and look toward the pole
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
               <TouchableOpacity
-                style={styles.linkButton}
-                onPress={() => Linking.openURL(event.infoUrl!)}
+                style={styles.reminderButton}
+                onPress={() => onSetReminder(event)}
               >
-                <Ionicons name="open-outline" size={16} color="#4488ff" />
-                <Text style={styles.linkButtonText}>Learn More</Text>
+                <Ionicons name="notifications-outline" size={18} color="#4488ff" />
+                <Text style={styles.reminderButtonText}>Set Reminder</Text>
               </TouchableOpacity>
-            )}
+
+              {event.infoUrl && (
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => Linking.openURL(event.infoUrl!)}
+                >
+                  <Ionicons name="open-outline" size={16} color="#4488ff" />
+                  <Text style={styles.linkButtonText}>Learn More</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -280,6 +388,7 @@ export function EventList({ location, isVisible, onClose }: EventListProps): JSX
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AstronomicalEvent | null>(null);
   const [filter, setFilter] = useState<EventType | 'all'>('all');
+  const [showSubscription, setShowSubscription] = useState(false);
 
   // Fetch events
   const fetchEvents = useCallback(async (refresh: boolean = false) => {
@@ -310,6 +419,30 @@ export function EventList({ location, isVisible, onClose }: EventListProps): JSX
   const handleRefresh = useCallback(() => {
     fetchEvents(true);
   }, [fetchEvents]);
+
+  // Handle set reminder
+  const handleSetReminder = useCallback(async (event: AstronomicalEvent) => {
+    if (!location) {
+      setShowSubscription(true);
+      return;
+    }
+
+    await notificationService.initialize();
+    const prefs = notificationService.getPreferences();
+
+    if (!prefs.enabled) {
+      setShowSubscription(true);
+      return;
+    }
+
+    // Schedule notifications for configured reminder times
+    for (const reminderTime of prefs.reminderTimes) {
+      await notificationService.scheduleEventNotification(event, location, reminderTime);
+    }
+
+    // Show confirmation (in a real app, use a toast)
+    alert(`Reminder set for ${event.name}`);
+  }, [location]);
 
   // Filter events
   const filteredEvents = events.filter((event) => filter === 'all' || event.type === filter);
@@ -344,9 +477,17 @@ export function EventList({ location, isVisible, onClose }: EventListProps): JSX
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Astronomical Events</Text>
-          <TouchableOpacity style={styles.closeHeaderButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#ffffff" />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.subscribeHeaderButton}
+              onPress={() => setShowSubscription(true)}
+            >
+              <Ionicons name="notifications-outline" size={22} color="#4488ff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeHeaderButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Filter tabs */}
@@ -435,7 +576,18 @@ export function EventList({ location, isVisible, onClose }: EventListProps): JSX
         )}
 
         {/* Event detail modal */}
-        <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <EventDetailModal
+          event={selectedEvent}
+          location={location}
+          onClose={() => setSelectedEvent(null)}
+          onSetReminder={handleSetReminder}
+        />
+
+        {/* Subscription modal */}
+        <SubscriptionModal
+          visible={showSubscription}
+          onClose={() => setShowSubscription(false)}
+        />
       </View>
     </Modal>
   );
@@ -461,6 +613,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subscribeHeaderButton: {
+    padding: 8,
+    marginRight: 8,
   },
   closeHeaderButton: {
     padding: 8,
@@ -699,6 +859,128 @@ const styles = StyleSheet.create({
   sourceText: {
     color: '#666666',
     fontSize: 12,
+  },
+  // Viewing direction styles
+  viewingDirectionCard: {
+    backgroundColor: 'rgba(68, 136, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(68, 136, 255, 0.3)',
+  },
+  viewingDirectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  viewingDirectionTitle: {
+    color: '#4488ff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    textTransform: 'uppercase',
+  },
+  viewingDirectionMain: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 12,
+  },
+  compassDisplay: {
+    alignItems: 'center',
+  },
+  compassDirection: {
+    color: '#ffffff',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  compassDegrees: {
+    color: '#888888',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  altitudeDisplay: {
+    alignItems: 'center',
+  },
+  altitudeValue: {
+    color: '#44ff88',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  altitudeLabel: {
+    color: '#888888',
+    fontSize: 12,
+  },
+  viewingDirectionDescription: {
+    color: '#cccccc',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  visibilityWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: 'rgba(255, 170, 0, 0.1)',
+    borderRadius: 8,
+  },
+  visibilityWarningText: {
+    color: '#ffaa00',
+    fontSize: 13,
+    marginLeft: 8,
+    flex: 1,
+  },
+  dateTimeCard: {
+    backgroundColor: '#0f0f1f',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  viewingTipsCard: {
+    backgroundColor: '#0f0f1f',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  viewingTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 10,
+  },
+  viewingTipText: {
+    color: '#cccccc',
+    fontSize: 13,
+    marginLeft: 10,
+    flex: 1,
+    lineHeight: 18,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+  },
+  reminderButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    backgroundColor: 'rgba(68, 136, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: '#4488ff',
+    borderRadius: 12,
+  },
+  reminderButtonText: {
+    color: '#4488ff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

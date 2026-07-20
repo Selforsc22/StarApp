@@ -16,6 +16,7 @@
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const emailService = require('./emailService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -38,8 +39,15 @@ const cache = {
 };
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow mobile app connections
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
+
+// Email subscription routes
+app.use('/api', emailService);
 
 // Meteor shower data (hardcoded annual calendar)
 const METEOR_SHOWERS = [

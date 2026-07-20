@@ -42,6 +42,7 @@ import { StarMap, ViewDirection } from './components/StarMap';
 import { starCatalog } from './services/starCatalog';
 import { OrientationHandler } from './components/OrientationHandler';
 import { EventList } from './components/EventList';
+import { SubscriptionModal } from './components/SubscriptionModal';
 import { sensorManager } from './services/sensorManager';
 import { formatAltitude, formatAzimuth } from './services/astronomyCalculations';
 import {
@@ -93,6 +94,7 @@ export default function App(): JSX.Element {
   const [targetStar, setTargetStar] = useState<Star | null>(null);
   const [showTimeTravel, setShowTimeTravel] = useState(false);
   const [showWhatsUp, setShowWhatsUp] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   // Update observation time
   useEffect(() => {
@@ -366,6 +368,17 @@ export default function App(): JSX.Element {
           settings={settings}
           onClose={() => setShowSettings(false)}
           onUpdateView={updateViewSettings}
+          onOpenNotifications={() => {
+            setShowSettings(false);
+            setShowSubscription(true);
+          }}
+          nightMode={settings.view.nightMode}
+        />
+
+        {/* Subscription Modal */}
+        <SubscriptionModal
+          visible={showSubscription}
+          onClose={() => setShowSubscription(false)}
           nightMode={settings.view.nightMode}
         />
 
@@ -426,6 +439,7 @@ interface SettingsModalProps {
   settings: AppSettings;
   onClose: () => void;
   onUpdateView: (updates: Partial<ViewSettings>) => void;
+  onOpenNotifications: () => void;
   nightMode: boolean;
 }
 
@@ -434,6 +448,7 @@ function SettingsModal({
   settings,
   onClose,
   onUpdateView,
+  onOpenNotifications,
   nightMode,
 }: SettingsModalProps): JSX.Element {
   const textColor = nightMode ? '#ff6666' : '#ffffff';
@@ -614,6 +629,35 @@ function SettingsModal({
                   ))}
                 </View>
               </View>
+            </View>
+
+            {/* Notifications Section */}
+            <View style={styles.settingsSection}>
+              <View style={styles.settingsSectionHeader}>
+                <Ionicons name="notifications-outline" size={18} color={accentColor} />
+                <Text style={[styles.settingsSectionTitle, { color: textColor }]}>Notifications</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.settingsCard, styles.notificationCard]}
+                onPress={onOpenNotifications}
+                activeOpacity={0.7}
+              >
+                <View style={styles.notificationCardContent}>
+                  <View style={styles.notificationCardLeft}>
+                    <Ionicons name="mail-outline" size={24} color={accentColor} />
+                    <View style={styles.notificationCardText}>
+                      <Text style={[styles.settingsLabel, { color: textColor }]}>
+                        Event Alerts & Email
+                      </Text>
+                      <Text style={[styles.settingsHint, { color: textColor }]}>
+                        Get reminders for meteor showers, eclipses & more
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={textColor} style={{ opacity: 0.5 }} />
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* About Section */}
@@ -1449,6 +1493,24 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     lineHeight: 20,
     marginBottom: 40,
+  },
+  notificationCard: {
+    padding: 0,
+  },
+  notificationCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  notificationCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  notificationCardText: {
+    marginLeft: 14,
+    flex: 1,
   },
   // Drag handle for modals
   dragHandle: {
